@@ -5,9 +5,11 @@
 package html
 
 import (
+	"fmt"
 	"html/template"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/Aadil-Nabi/kvcbom/pkg/report"
 )
@@ -26,6 +28,12 @@ var funcs = template.FuncMap{
 	},
 	"dict": func(title string, counts []report.Count) map[string]any {
 		return map[string]any{"title": title, "counts": counts}
+	},
+	"caplist": func(names []string, n int) string {
+		if len(names) <= n {
+			return strings.Join(names, ", ")
+		}
+		return strings.Join(names[:n], ", ") + fmt.Sprintf(" (+%d more)", len(names)-n)
 	},
 }
 
@@ -107,13 +115,14 @@ footer { margin-top: 3rem; padding-top: .75rem; border-top: 1px solid #999; font
 {{template "counts" dict "By system" .Inventory.BySystem}}
 
 <h2>Findings</h2>
-{{if .Findings}}
-<table><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>Verify</th></tr></thead>
-<tbody>{{range .Findings}}<tr>
+{{if .FindingGroups}}
+<p class="muted">Grouped by type; {{len .Findings}} finding(s) in total.</p>
+<table><thead><tr><th>Severity</th><th>Finding</th><th>Assets</th><th>Affected</th></tr></thead>
+<tbody>{{range .FindingGroups}}<tr>
   <td><span class="sev">{{.Severity}}</span></td>
-  <td>{{.Title}}{{if .Explanation}}<br><span class="muted">{{.Explanation}}</span>{{end}}</td>
-  <td><code>{{.AssetID}}</code></td>
-  <td>{{if .RequiresVerification}}verify{{else}}&mdash;{{end}}</td>
+  <td>{{.Title}}{{if .Explanation}}<br><span class="muted">{{.Explanation}}</span>{{end}}{{if .RequiresVerification}}<br><span class="muted">{{.RequiresVerification}} require verification</span>{{end}}</td>
+  <td>{{.Count}}</td>
+  <td>{{caplist .Assets 12}}</td>
 </tr>{{end}}</tbody></table>
 {{else}}<p>No findings.</p>{{end}}
 
@@ -126,10 +135,13 @@ footer { margin-top: 3rem; padding-top: .75rem; border-top: 1px solid #999; font
 {{end}}
 {{end}}
 
-{{if .Framework}}
-<h2>Framework mapping &mdash; {{.Framework.Name}}</h2>
+{{if .Frameworks}}
+<h2>Framework mapping</h2>
+{{range .Frameworks}}
+<h3>{{.Name}}</h3>
 <table><thead><tr><th>Finding type</th><th>Control</th><th>Findings</th><th>Verified</th></tr></thead>
-<tbody>{{range .Framework.Mappings}}<tr><td>{{.FindingType}}</td><td>{{.ControlID}}</td><td>{{.FindingCount}}</td><td>{{if .Unverified}}NO (TODO){{else}}yes{{end}}</td></tr>{{end}}</tbody></table>
+<tbody>{{range .Mappings}}<tr><td>{{.FindingType}}</td><td>{{.ControlID}}</td><td>{{.FindingCount}}</td><td>{{if .Unverified}}NO (TODO){{else}}yes{{end}}</td></tr>{{end}}</tbody></table>
+{{end}}
 {{end}}
 
 {{if .Remediation}}
@@ -141,6 +153,20 @@ footer { margin-top: 3rem; padding-top: .75rem; border-top: 1px solid #999; font
 {{end}}
 {{end}}
 
+{{if .AffectedAssets}}
+<h2>Affected assets &mdash; remediation detail</h2>
+<p class="muted">The {{len .AffectedAssets}} algorithm(s) that need action, with where each was found.</p>
+<table><thead><tr><th>Severity</th><th>Algorithm</th><th>Status</th><th>Role</th><th>Occurrences</th><th>Found at</th></tr></thead>
+<tbody>{{range .AffectedAssets}}<tr>
+  <td><span class="sev">{{.Severity}}</span></td>
+  <td>{{.Name}}</td>
+  <td>{{.Status}}</td>
+  <td>{{.Primitive}}</td>
+  <td>{{.Count}}</td>
+  <td>{{caplist .Locations 6}}</td>
+</tr>{{end}}</tbody></table>
+{{end}}
+
 <h2>Appendix</h2>
 <h3>Methodology</h3>
 <p>{{.Appendix.Methodology}}</p>
@@ -148,7 +174,8 @@ footer { margin-top: 3rem; padding-top: .75rem; border-top: 1px solid #999; font
 <p><code>{{.Appendix.ScoringFormula}}</code></p>
 {{if .Appendix.MergeDecisions}}
 <h3>Merge decisions</h3>
-<ul>{{range .Appendix.MergeDecisions}}<li><code>{{.AssetID}}</code> ({{.AssetName}}) merged from: {{range .Sources}}{{.}}; {{end}}</li>{{end}}</ul>
+<p class="muted">{{len .Appendix.MergeDecisions}} asset(s) were formed by merging duplicate records across inputs.</p>
+<ul>{{range .Appendix.MergeDecisions}}<li>{{if .AssetName}}{{.AssetName}} {{end}}(<code>{{.AssetID}}</code>) &mdash; merged {{len .Sources}} source record(s)</li>{{end}}</ul>
 {{end}}
 {{if .Appendix.Sources}}
 <h3>Sources</h3>

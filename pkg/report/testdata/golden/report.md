@@ -14,7 +14,7 @@
 ## Warnings
 
 - 2 finding(s) rest on low-confidence evidence (C1/C2) and are marked as requiring verification
-- 1 asset(s) could not be classified from the available data
+- 1 asset(s) could not be classified — typically protocol endpoints (TLS/SSH/IKE) and key containers (e.g. JKS, PKCS#12) that do not name a single algorithm, rather than assessment failures; enrich the CBOM to classify any that are genuine algorithms
 
 ## Executive summary
 
@@ -76,12 +76,14 @@ Harvest-now-decrypt-later (HNDL) exposure: **1 asset(s)**.
 
 ## Findings
 
-| Severity | Finding | Asset | Verify |
+Grouped by type; 4 finding(s) in total.
+
+| Severity | Finding | Assets | Affected |
 |---|---|---|---|
-| critical | Public-key algorithm broken by Shor's algorithm | `0114ca6a0423d2f7` | yes |
-| high | Algorithm already broken by classical cryptanalysis | `b16e3233656248bb` | no |
-| info | Cryptographic asset could not be classified | `0192dc1aa20f75c3` | yes |
-| info | Quantum-resistant algorithm in use | `8cfcafe97b4afde8` | no |
+| critical | Key establishment broken by Shor's algorithm (harvest-now-decrypt-later) | 1 | RSA-2048 |
+| high | Algorithm already broken by classical cryptanalysis | 1 | SHA-1 |
+| info | Quantum-resistant algorithm in use | 1 | AES-256-GCM |
+| info | Cryptographic asset could not be classified | 1 | TLS 1.3 |
 
 ## Per-system view
 
@@ -97,7 +99,7 @@ Findings: critical 1, info 1.
 
 Plan migration of key establishment to ML-KEM (FIPS 203) and signatures to ML-DSA (FIPS 204) or SLH-DSA (FIPS 205), prioritising systems that protect long-lived data or perform key establishment over untrusted networks. Hybrid (classical + PQC) deployment is a common transitional step. 
 
-Applies to 1 finding(s): quantum-vulnerable-asymmetric.
+Applies to 1 finding(s): quantum-vulnerable-key-establishment.
 
 References: fips-203, fips-204, fips-205, nist-ir-8547.
 
@@ -116,6 +118,15 @@ Enrich the source CBOM or supply a manual register entry with the algorithm fami
 Applies to 1 finding(s): unclassified-crypto-asset.
 
 References: nist-pqc.
+
+## Affected assets (remediation detail)
+
+The 2 algorithm(s) that need action, with where each was found.
+
+| Severity | Algorithm | Status | Role | Occurrences | Found at |
+|---|---|---|---|---|---|
+| critical | RSA-2048 | shor_broken | pke | 1 |  |
+| high | SHA-1 | classically_broken | hash | 1 |  |
 
 ## Appendix
 

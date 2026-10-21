@@ -211,6 +211,7 @@ func build(r *raw) (*Pack, error) {
 			Status:       classify.QuantumStatus(c.QuantumStatus),
 			Rationale:    c.Rationale,
 			SourceID:     c.Source,
+			Primitive:    c.Primitive,
 			Deprecation:  milestone(c.Deprecation),
 			Disallowance: milestone(c.Disallowance),
 			Match:        m,

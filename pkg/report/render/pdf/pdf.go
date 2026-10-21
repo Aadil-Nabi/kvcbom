@@ -35,6 +35,9 @@ const (
 // Render implements report.Renderer / report.PDFRenderer.
 func (PureGo) Render(r *report.Report, w io.Writer) error {
 	pdf := fpdf.New("P", "mm", "A4", "")
+	// Sort internal resource catalogs (fonts, etc.) so the output is byte-reproducible;
+	// without this fpdf emits the font dictionary in Go-map order.
+	pdf.SetCatalogSort(true)
 	pdf.SetMargins(margin, margin, margin)
 	pdf.SetAutoPageBreak(true, margin)
 	pdf.SetTitle(clean(r.Title), true)
@@ -52,7 +55,9 @@ func (PureGo) Render(r *report.Report, w io.Writer) error {
 	d.warnings(r)
 	d.summary(r)
 	d.findings(r)
+	d.frameworks(r)
 	d.remediation(r)
+	d.affected(r)
 	d.appendix(r)
 
 	if err := pdf.Error(); err != nil {
@@ -172,19 +177,27 @@ func (d *doc) summary(r *report.Report) {
 
 func (d *doc) findings(r *report.Report) {
 	d.h2("Findings")
-	if len(r.Findings) == 0 {
+	if len(r.FindingGroups) == 0 {
 		d.para("No findings.")
 		return
 	}
-	widths := []float64{25, 30, 125}
-	d.row(widths, []string{"Severity", "Asset", "Finding"}, true)
-	for _, f := range r.Findings {
-		title := f.Title
-		if f.RequiresVerification {
-			title += " (requires verification)"
+	d.para(fmt.Sprintf("Grouped by type; %d finding(s) in total.", len(r.Findings)))
+	widths := []float64{22, 16, 142}
+	d.row(widths, []string{"Severity", "Assets", "Finding"}, true)
+	for _, g := range r.FindingGroups {
+		txt := g.Title
+		if len(g.Assets) > 0 {
+			txt += ": " + capList(g.Assets, 6)
 		}
-		d.row(widths, []string{string(f.Severity), shortID(f.AssetID), title}, false)
+		d.row(widths, []string{g.Severity, fmt.Sprintf("%d", g.Count), txt}, false)
 	}
+}
+
+func capList(names []string, n int) string {
+	if len(names) <= n {
+		return strings.Join(names, ", ")
+	}
+	return strings.Join(names[:n], ", ") + fmt.Sprintf(" (+%d more)", len(names)-n)
 }
 
 func (d *doc) remediation(r *report.Report) {
@@ -199,6 +212,40 @@ func (d *doc) remediation(r *report.Report) {
 			d.para(item.Detail)
 		}
 		d.para(fmt.Sprintf("Applies to %d finding(s): %s.", item.FindingCount, strings.Join(item.FindingTypes, ", ")))
+	}
+}
+
+func (d *doc) frameworks(r *report.Report) {
+	if len(r.Frameworks) == 0 {
+		return
+	}
+	d.h2("Framework mapping")
+	for _, fw := range r.Frameworks {
+		d.pdf.SetFont("Helvetica", "B", 11)
+		d.pdf.MultiCell(usableW, lh, d.tr(fw.Name), "", "L", false)
+		widths := []float64{70, 80, 18, 22}
+		d.row(widths, []string{"Finding type", "Control", "Count", "Verified"}, true)
+		for _, m := range fw.Mappings {
+			verified := "yes"
+			if m.Unverified {
+				verified = "NO (TODO)"
+			}
+			d.row(widths, []string{m.FindingType, m.ControlID, fmt.Sprintf("%d", m.FindingCount), verified}, false)
+		}
+		d.pdf.Ln(2)
+	}
+}
+
+func (d *doc) affected(r *report.Report) {
+	if len(r.AffectedAssets) == 0 {
+		return
+	}
+	d.h2("Affected assets - remediation detail")
+	d.para(fmt.Sprintf("The %d algorithm(s) that need action, with where each was found.", len(r.AffectedAssets)))
+	widths := []float64{20, 52, 33, 15, 60}
+	d.row(widths, []string{"Severity", "Algorithm", "Status", "Count", "Found at"}, true)
+	for _, a := range r.AffectedAssets {
+		d.row(widths, []string{a.Severity, a.Name, a.Status, fmt.Sprintf("%d", a.Count), capList(a.Locations, 3)}, false)
 	}
 }
 
@@ -228,13 +275,6 @@ func yesno(b bool) string {
 
 func trimFloat(f float64) string {
 	return strings.TrimSuffix(strings.TrimSuffix(fmt.Sprintf("%.1f", f), "0"), ".")
-}
-
-func shortID(id string) string {
-	if len(id) > 12 {
-		return id[:12]
-	}
-	return id
 }
 
 // clean replaces the few non-Windows-1252 characters the report text can contain, so the

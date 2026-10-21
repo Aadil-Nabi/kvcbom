@@ -1,0 +1,4 @@
+# Example CBOM extension mapping for a scanner that records the algorithm in a
+# "<vendor>:cipher" property instead of the component name.
+algorithm_keys:
+  - "*:cipher"

@@ -66,11 +66,13 @@ type CRQCScenario struct {
 }
 
 // LinkRule attaches matching CBOM components to a system. A component matches when its
-// bom-ref is listed or its name matches a pattern.
+// bom-ref is listed, its name matches a name pattern, or one of its locations matches a
+// location pattern (useful for scanner CBOMs where assets are located at endpoints).
 type LinkRule struct {
-	SystemRef    string   `json:"system_ref"`
-	BOMRefs      []string `json:"bom_refs,omitempty"`
-	NamePatterns []string `json:"name_patterns,omitempty"`
+	SystemRef        string   `json:"system_ref"`
+	BOMRefs          []string `json:"bom_refs,omitempty"`
+	NamePatterns     []string `json:"name_patterns,omitempty"`
+	LocationPatterns []string `json:"location_patterns,omitempty"`
 }
 
 // AssessmentMeta is the scope/attribution recorded on the report cover.

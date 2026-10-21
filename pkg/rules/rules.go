@@ -111,12 +111,18 @@ func Evaluate(assets []model.Asset, p *rulepack.Pack) (*Result, error) {
 }
 
 func toInput(a model.Asset, cres classify.Result) rulepack.RuleInput {
+	// Fall back to the role the classification implies when the CBOM did not record a
+	// primitive, so rules can distinguish key establishment from signatures on scanner data.
+	primitive := a.Primitive
+	if primitive == "" {
+		primitive = cres.Primitive
+	}
 	in := rulepack.RuleInput{
 		Type:         string(a.Type),
 		Name:         a.Name,
 		ParameterSet: a.ParameterSet,
 		Mode:         a.Mode,
-		Primitive:    a.Primitive,
+		Primitive:    primitive,
 		Curve:        a.Curve,
 		OID:          a.OID,
 		Functions:    a.Functions,

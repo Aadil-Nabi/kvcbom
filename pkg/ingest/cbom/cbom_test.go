@@ -66,8 +66,8 @@ func TestIngestFile_Algorithm(t *testing.T) {
 	if !reflect.DeepEqual(rsa.Locations, []string{"src/payments/sign.go"}) {
 		t.Errorf("RSA locations = %v", rsa.Locations)
 	}
-	if e := rsa.Evidence; len(e) != 1 || e[0].SourceType != model.SourceScannerCBOM || e[0].Confidence != model.C2 {
-		t.Errorf("RSA evidence = %+v, want one scanner/C2 record", e)
+	if e := rsa.Evidence; len(e) != 1 || e[0].SourceType != model.SourceScannerCBOM || e[0].Confidence != model.C3 {
+		t.Errorf("RSA evidence = %+v, want one scanner/C3 record", e)
 	}
 
 	kem := assetByRef(res.Batch, "alg:ml-kem-768")

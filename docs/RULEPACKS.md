@@ -1,5 +1,32 @@
 # Rule packs
 
+There are two kinds of pack:
+
+- **Classifier pack** (e.g. `baseline-pqc`): has a classification table + rules. It decides
+  each asset's quantum status and produces findings. Pass it with `--rulepack`.
+- **Framework overlay** (e.g. `nist-ir-8547`, `csa-qri-sg`, `cnsa-2.0`, `enisa-eu`, `uk-ncsc`):
+  has **no** classification of its own; it only maps finding types onto a framework's / a
+  national regulator's controls. Pass one or more with `--framework`, alongside a classifier.
+  One report can carry several overlays, so it speaks to several frameworks at once.
+
+This split keeps classification universal and NIST-grounded (one source of truth) while each
+regulator view is pure, verifiable mapping content. To turn a shipped structure-only overlay
+into a verified one, follow the per-regulator checklist in [`REGULATORS.md`](REGULATORS.md).
+
+### Canonical finding-type vocabulary
+
+Overlays map these finding types (emitted by the `baseline-pqc` classifier):
+
+| finding type | meaning |
+|---|---|
+| `quantum-vulnerable-key-establishment` | Shor-broken key exchange / PKE (harvest-now-decrypt-later) |
+| `quantum-vulnerable-signature` | Shor-broken signature (forgery risk, not HNDL) |
+| `quantum-vulnerable-asymmetric` | Shor-broken, role undetermined |
+| `classically-broken-primitive` | already broken/disallowed (MD5, SHA-1, 3DES, RC4) |
+| `symmetric-strength-reduced` | Grover-weakened symmetric cipher |
+| `unclassified-crypto-asset` | could not be classified |
+| `quantum-resistant-in-use` | no known practical quantum attack |
+
 A rule pack is a single versioned YAML file. It supplies the standards content kvcbom itself
 must never invent: the algorithm classification table, the rules that turn classifications into
 findings, framework-control mappings, remediation guidance, and the scoring weights. Packs are

@@ -73,21 +73,33 @@ it, and `diff` consumes it.
 - [`docs/USAGE.md`](docs/USAGE.md) — commands, flags, and examples.
 - [`docs/CONTEXT.md`](docs/CONTEXT.md) — the assessment context file.
 - [`docs/RULEPACKS.md`](docs/RULEPACKS.md) — writing and verifying a rule pack.
+- [`docs/REGULATORS.md`](docs/REGULATORS.md) — fill-in checklist to verify a regulator overlay.
 - [`docs/SCORING.md`](docs/SCORING.md) — the risk model and Mosca inequality.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — architecture decision records.
 - [`SECURITY.md`](SECURITY.md) — input-safety model and reporting.
 
 ## Rule packs
 
-| Pack | Status | Notes |
-|---|---|---|
-| `baseline-pqc` | final | Quantum-vulnerability classification from established facts; every entry is source-cited. |
-| `nist-ir-8547` | draft | Classification + framework-mapping structure; control text as `TODO(source):`. |
-| `cnsa-2.0` | draft | Classification + framework-mapping structure; control text as `TODO(source):`. |
-| `csa-qri-sg` | vendor | Classification + framework-mapping structure; control text as `TODO(source):`. |
+| Pack | Kind | Status | Notes |
+|---|---|---|---|
+| `baseline-pqc` | classifier | final | Quantum-vulnerability classification from established facts; every entry source-cited. |
+| `nist-ir-8547` | overlay | draft | NIST IR 8547 transition mapping; control text as `TODO(source):`. |
+| `cnsa-2.0` | overlay | draft | NSA CNSA 2.0 mapping; control text as `TODO(source):`. |
+| `csa-qri-sg` | overlay | vendor | CSA Singapore mapping; control text as `TODO(source):`. |
+| `enisa-eu` | overlay | draft | ENISA (EU) mapping; control text as `TODO(source):`. |
+| `uk-ncsc` | overlay | draft | UK NCSC mapping; control text as `TODO(source):`. |
 
-A report generated with a draft/vendor pack, or one that still contains `TODO(source):`
-markers, carries a visible "unverified rule content" warning.
+Classify with the `baseline-pqc` **classifier** (`--rulepack`) and add one or more regulator
+**overlays** (`--framework`) to map the findings onto their controls — several in one report:
+
+```sh
+kvcbom report --cbom app.cbom.json --rulepack baseline-pqc \
+  --framework csa-qri-sg --framework nist-ir-8547 --format html,pdf --out ./out
+```
+
+A report using a draft/vendor pack, or any overlay whose control text is still a
+`TODO(source):` placeholder, carries a visible "unverified content" warning. Supports both
+CycloneDX 1.6 and 1.7, and `--cbom-mapping` adapts to any scanner's property conventions.
 
 ## Development
 

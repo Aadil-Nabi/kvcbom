@@ -26,6 +26,7 @@ func (Renderer) Render(r *report.Report, w io.Writer) error {
 	writeSystems(b, r)
 	writeFramework(b, r)
 	writeRemediation(b, r)
+	writeAffected(b, r)
 	writeAppendix(b, r)
 
 	_, err := io.WriteString(w, b.String())
@@ -123,16 +124,25 @@ func writeCountTable(b *strings.Builder, title string, counts []report.Count) {
 
 func writeFindings(b *strings.Builder, r *report.Report) {
 	fmt.Fprintf(b, "## Findings\n\n")
-	if len(r.Findings) == 0 {
+	if len(r.FindingGroups) == 0 {
 		fmt.Fprintf(b, "No findings.\n\n")
 		return
 	}
-	fmt.Fprintf(b, "| Severity | Finding | Asset | Verify |\n|---|---|---|---|\n")
-	for _, f := range r.Findings {
-		fmt.Fprintf(b, "| %s | %s | `%s` | %s |\n",
-			f.Severity, mdEsc(f.Title), f.AssetID, yesno(f.RequiresVerification))
+	fmt.Fprintf(b, "Grouped by type; %d finding(s) in total.\n\n", len(r.Findings))
+	fmt.Fprintf(b, "| Severity | Finding | Assets | Affected |\n|---|---|---|---|\n")
+	for _, g := range r.FindingGroups {
+		fmt.Fprintf(b, "| %s | %s | %d | %s |\n",
+			g.Severity, mdEsc(g.Title), g.Count, mdEsc(capList(g.Assets, 8)))
 	}
 	fmt.Fprintf(b, "\n")
+}
+
+// capList joins up to n names, appending a "(+K more)" note when the list is longer.
+func capList(names []string, n int) string {
+	if len(names) <= n {
+		return strings.Join(names, ", ")
+	}
+	return strings.Join(names[:n], ", ") + fmt.Sprintf(" (+%d more)", len(names)-n)
 }
 
 func writeSystems(b *strings.Builder, r *report.Report) {
@@ -159,19 +169,22 @@ func writeSystems(b *strings.Builder, r *report.Report) {
 }
 
 func writeFramework(b *strings.Builder, r *report.Report) {
-	if r.Framework == nil {
+	if len(r.Frameworks) == 0 {
 		return
 	}
-	fmt.Fprintf(b, "## Framework mapping — %s\n\n", mdEsc(r.Framework.Name))
-	fmt.Fprintf(b, "| Finding type | Control | Findings | Verified |\n|---|---|---|---|\n")
-	for _, m := range r.Framework.Mappings {
-		verified := "yes"
-		if m.Unverified {
-			verified = "NO (TODO)"
+	fmt.Fprintf(b, "## Framework mapping\n\n")
+	for _, fw := range r.Frameworks {
+		fmt.Fprintf(b, "### %s\n\n", mdEsc(fw.Name))
+		fmt.Fprintf(b, "| Finding type | Control | Findings | Verified |\n|---|---|---|---|\n")
+		for _, m := range fw.Mappings {
+			verified := "yes"
+			if m.Unverified {
+				verified = "NO (TODO)"
+			}
+			fmt.Fprintf(b, "| %s | %s | %d | %s |\n", m.FindingType, mdEsc(m.ControlID), m.FindingCount, verified)
 		}
-		fmt.Fprintf(b, "| %s | %s | %d | %s |\n", m.FindingType, mdEsc(m.ControlID), m.FindingCount, verified)
+		fmt.Fprintf(b, "\n")
 	}
-	fmt.Fprintf(b, "\n")
 }
 
 func writeRemediation(b *strings.Builder, r *report.Report) {
@@ -191,6 +204,20 @@ func writeRemediation(b *strings.Builder, r *report.Report) {
 	}
 }
 
+func writeAffected(b *strings.Builder, r *report.Report) {
+	if len(r.AffectedAssets) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "## Affected assets (remediation detail)\n\n")
+	fmt.Fprintf(b, "The %d algorithm(s) that need action, with where each was found.\n\n", len(r.AffectedAssets))
+	fmt.Fprintf(b, "| Severity | Algorithm | Status | Role | Occurrences | Found at |\n|---|---|---|---|---|---|\n")
+	for _, a := range r.AffectedAssets {
+		fmt.Fprintf(b, "| %s | %s | %s | %s | %d | %s |\n",
+			a.Severity, mdEsc(a.Name), a.Status, a.Primitive, a.Count, mdEsc(capList(a.Locations, 6)))
+	}
+	fmt.Fprintf(b, "\n")
+}
+
 func writeAppendix(b *strings.Builder, r *report.Report) {
 	fmt.Fprintf(b, "## Appendix\n\n")
 	fmt.Fprintf(b, "### Methodology\n\n%s\n\n", r.Appendix.Methodology)
@@ -198,8 +225,9 @@ func writeAppendix(b *strings.Builder, r *report.Report) {
 
 	if len(r.Appendix.MergeDecisions) > 0 {
 		fmt.Fprintf(b, "### Merge decisions\n\n")
+		fmt.Fprintf(b, "%d asset(s) were formed by merging duplicate records across inputs.\n\n", len(r.Appendix.MergeDecisions))
 		for _, d := range r.Appendix.MergeDecisions {
-			fmt.Fprintf(b, "- `%s` (%s) merged from: %s\n", d.AssetID, mdEsc(d.AssetName), strings.Join(d.Sources, ", "))
+			fmt.Fprintf(b, "- %s (`%s`) — merged %d source record(s)\n", mdEsc(nameOr(d.AssetName, d.AssetID)), d.AssetID, len(d.Sources))
 		}
 		fmt.Fprintf(b, "\n")
 	}
@@ -211,6 +239,13 @@ func writeAppendix(b *strings.Builder, r *report.Report) {
 		}
 		fmt.Fprintf(b, "\n")
 	}
+}
+
+func nameOr(name, fallback string) string {
+	if name != "" {
+		return name
+	}
+	return fallback
 }
 
 func yesno(b bool) string {

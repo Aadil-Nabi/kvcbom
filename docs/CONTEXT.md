@@ -37,10 +37,16 @@ systems:
     data_class_refs: [ephemeral]
 link_rules:                      # attach CBOM assets to systems
   - system_ref: payments
-    name_patterns: ["(?i)rsa", "(?i)ecdsa"]   # Go RE2 regular expressions
+    name_patterns: ["(?i)rsa", "(?i)ecdsa"]       # Go RE2 regex on the asset/algorithm name
+    location_patterns: [":443$", ":8443$"]        # Go RE2 regex on the asset's locations
   - system_ref: logging
-    bom_refs: ["alg:aes-logging"]             # exact CycloneDX bom-ref match
+    bom_refs: ["alg:aes-logging"]                 # exact CycloneDX bom-ref match
 ```
+
+`location_patterns` are the usual way to link **scanner** CBOMs: those name each asset by its
+endpoint (e.g. `172.31.100.76:443`), which kvcbom records as the asset's location, so you map
+by port or host. A worked example that maps the bundled scanner CBOM lives at
+[`testdata/context-sample.yaml`](../testdata/context-sample.yaml).
 
 ## How linking works
 

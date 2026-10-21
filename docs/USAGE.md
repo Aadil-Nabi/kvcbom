@@ -1,6 +1,9 @@
 # Usage
 
 `kvcbom` has no runtime network access. All rule packs, schemas, and templates are embedded.
+CBOMs are accepted from any tool: both **CycloneDX 1.6 and 1.7** are validated against the
+matching embedded schema (selected from the document's `specVersion`), and `--cbom-mapping`
+adapts to a scanner that records the algorithm in a vendor-specific property.
 
 ## Global flags
 
@@ -48,6 +51,7 @@ kvcbom report \
 | `--cbom` | — | CBOM file (repeatable) |
 | `--register` | — | Manual register (`.xlsx` or `.csv`) |
 | `--register-mapping` | built-in | Column-mapping YAML for the register |
+| `--cbom-mapping` | built-in | CBOM extension-mapping YAML: which vendor property keys carry the algorithm |
 | `--context` | — | Assessment context file |
 | `--rulepack` | `baseline-pqc` | Pack id or path |
 | `--format` | `json` | Any of `json,html,md,pdf` |

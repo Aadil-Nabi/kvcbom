@@ -33,22 +33,24 @@ type PDFRenderer interface {
 
 // Report is the canonical assessment result.
 type Report struct {
-	SchemaVersion int                  `json:"schema_version"`
-	Tool          ToolInfo             `json:"tool"`
-	GeneratedAt   string               `json:"generated_at"`
-	Title         string               `json:"title"`
-	Assessment    model.AssessmentMeta `json:"assessment"`
-	Pack          PackInfo             `json:"pack"`
-	Inputs        []merge.InputHash    `json:"inputs"`
-	Warnings      Warnings             `json:"warnings"`
-	Summary       Summary              `json:"summary"`
-	Inventory     Inventory            `json:"inventory"`
-	Assets        []AssetView          `json:"assets"`
-	Findings      []model.Finding      `json:"findings"`
-	Systems       []SystemView         `json:"systems"`
-	Framework     *FrameworkView       `json:"framework,omitempty"`
-	Remediation   []RemediationItem    `json:"remediation"`
-	Appendix      Appendix             `json:"appendix"`
+	SchemaVersion  int                  `json:"schema_version"`
+	Tool           ToolInfo             `json:"tool"`
+	GeneratedAt    string               `json:"generated_at"`
+	Title          string               `json:"title"`
+	Assessment     model.AssessmentMeta `json:"assessment"`
+	Pack           PackInfo             `json:"pack"`
+	Inputs         []merge.InputHash    `json:"inputs"`
+	Warnings       Warnings             `json:"warnings"`
+	Summary        Summary              `json:"summary"`
+	Inventory      Inventory            `json:"inventory"`
+	Assets         []AssetView          `json:"assets"`
+	FindingGroups  []FindingGroup       `json:"finding_groups"`
+	AffectedAssets []AffectedAsset      `json:"affected_assets"`
+	Findings       []model.Finding      `json:"findings"`
+	Systems        []SystemView         `json:"systems"`
+	Frameworks     []FrameworkView      `json:"frameworks,omitempty"`
+	Remediation    []RemediationItem    `json:"remediation"`
+	Appendix       Appendix             `json:"appendix"`
 }
 
 // ToolInfo identifies the tool build that produced the report.
@@ -123,6 +125,33 @@ type AssetView struct {
 	Classified     bool            `json:"classified"`
 	Classification classify.Result `json:"classification"`
 	Score          model.RiskScore `json:"score"`
+}
+
+// FindingGroup collapses all findings of one finding type into a single, readable entry
+// for the report body: the shared severity/title/explanation, how many assets are
+// affected, and the distinct affected asset names. The per-finding detail stays in
+// Findings (and the JSON) for machine use and full traceability.
+type FindingGroup struct {
+	FindingType          string   `json:"finding_type"`
+	Severity             string   `json:"severity"`
+	Title                string   `json:"title"`
+	Explanation          string   `json:"explanation,omitempty"`
+	RemediationRef       string   `json:"remediation_ref,omitempty"`
+	Count                int      `json:"count"`
+	RequiresVerification int      `json:"requires_verification_count"`
+	Assets               []string `json:"assets"`
+}
+
+// AffectedAsset is one actionable asset (a finding of medium severity or higher) with the
+// detail an engineer needs to act: the algorithm, its quantum status, and where it was
+// found. It drives the remediation-detail appendix so engineers need not open the JSON.
+type AffectedAsset struct {
+	Name      string   `json:"name"`
+	Status    string   `json:"status"`
+	Severity  string   `json:"severity"`
+	Primitive string   `json:"primitive,omitempty"`
+	Count     int      `json:"count"` // how many occurrences (one algorithm at many endpoints)
+	Locations []string `json:"locations,omitempty"`
 }
 
 // SystemView lists the assets and findings attributed to one business system.

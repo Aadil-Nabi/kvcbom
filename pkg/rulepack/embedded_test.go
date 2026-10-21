@@ -3,8 +3,6 @@ package rulepack
 import (
 	"testing"
 
-	"github.com/Aadil-Nabi/kvcbom/pkg/classify"
-	"github.com/Aadil-Nabi/kvcbom/pkg/model"
 	"github.com/Aadil-Nabi/kvcbom/rulepacks"
 )
 
@@ -28,8 +26,15 @@ func TestEmbeddedPacks_LoadAndValidateWithoutErrors(t *testing.T) {
 	}
 }
 
-func TestFrameworkPacks_UnverifiedAndMapped(t *testing.T) {
-	for _, id := range []string{"nist-ir-8547", "cnsa-2.0", "csa-qri-sg"} {
+func TestFrameworkOverlays_MappedAndClassifierless(t *testing.T) {
+	// The canonical finding-type vocabulary a classifier emits; overlays map these.
+	wantTypes := map[string]bool{
+		"quantum-vulnerable-key-establishment": true,
+		"quantum-vulnerable-signature":         true,
+		"classically-broken-primitive":         true,
+		"symmetric-strength-reduced":           true,
+	}
+	for _, id := range []string{"nist-ir-8547", "cnsa-2.0", "csa-qri-sg", "enisa-eu", "uk-ncsc"} {
 		t.Run(id, func(t *testing.T) {
 			lp, err := LoadEmbedded(id)
 			if err != nil {
@@ -37,17 +42,21 @@ func TestFrameworkPacks_UnverifiedAndMapped(t *testing.T) {
 			}
 			p := lp.Pack
 			if !p.HasUnverifiedContent() {
-				t.Errorf("%s is structure-only and must report unverified content", id)
+				t.Errorf("%s is a structure-only overlay and must report unverified content", id)
 			}
-			if fw := p.Framework(); fw.ID == "" || len(fw.Mappings) == 0 {
-				t.Errorf("%s should define a framework with mappings, got %+v", id, fw)
+			// An overlay has no classification table of its own.
+			if len(p.ClassificationEntries()) != 0 {
+				t.Errorf("%s is an overlay and should carry no classifications", id)
 			}
-			// It still classifies the basics from real sources.
-			if res, ok := p.Classify(model.Asset{Name: "RSA-2048"}); !ok || res.Status != classify.StatusShorBroken {
-				t.Errorf("%s: RSA should classify shor_broken, got %q ok=%v", id, res.Status, ok)
+			fw := p.Framework()
+			if fw.ID == "" || len(fw.Mappings) == 0 {
+				t.Fatalf("%s should define a framework with mappings, got %+v", id, fw)
 			}
-			if res, ok := p.Classify(model.Asset{Name: "ML-KEM-768"}); !ok || res.Status != classify.StatusQuantumResistant {
-				t.Errorf("%s: ML-KEM should classify quantum_resistant, got %q", id, res.Status)
+			// Every mapping targets a finding type in the canonical vocabulary.
+			for _, m := range fw.Mappings {
+				if !wantTypes[m.FindingType] {
+					t.Errorf("%s maps unknown finding type %q", id, m.FindingType)
+				}
 			}
 		})
 	}

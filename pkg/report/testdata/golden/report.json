@@ -32,7 +32,7 @@
     "low_confidence_finding_share": 0.5,
     "messages": [
       "2 finding(s) rest on low-confidence evidence (C1/C2) and are marked as requiring verification",
-      "1 asset(s) could not be classified from the available data"
+      "1 asset(s) could not be classified — typically protocol endpoints (TLS/SSH/IKE) and key containers (e.g. JKS, PKCS#12) that do not name a single algorithm, rather than assessment failures; enrich the CBOM to classify any that are genuine algorithms"
     ]
   },
   "summary": {
@@ -187,6 +187,7 @@
           "oid"
         ],
         "source_id": "shor-1997",
+        "primitive": "pke",
         "rationale": "RSA security rests on integer factorisation, which Shor's algorithm solves in polynomial time on a CRQC.",
         "pack_id": "baseline-pqc",
         "pack_version": "1.0.0"
@@ -292,6 +293,7 @@
           "name"
         ],
         "source_id": "grover-1996",
+        "primitive": "block-cipher",
         "rationale": "AES-256 retains ~128 bits of security under Grover's algorithm.",
         "pack_id": "baseline-pqc",
         "pack_version": "1.0.0"
@@ -352,6 +354,7 @@
           "name"
         ],
         "source_id": "shattered-2017",
+        "primitive": "hash",
         "rationale": "SHA-1 is collision-broken (SHAttered) and disallowed by NIST SP 800-131A.",
         "pack_id": "baseline-pqc",
         "pack_version": "1.0.0"
@@ -376,14 +379,79 @@
       }
     }
   ],
+  "finding_groups": [
+    {
+      "finding_type": "quantum-vulnerable-key-establishment",
+      "severity": "critical",
+      "title": "Key establishment broken by Shor's algorithm (harvest-now-decrypt-later)",
+      "explanation": "This asset performs key establishment or public-key encryption whose security rests on factoring or discrete logarithms, both solved efficiently by Shor's algorithm on a cryptographically relevant quantum computer. An adversary can record the protected traffic today and decrypt it once such a computer exists (harvest-now-decrypt-later).\n",
+      "remediation_ref": "migrate-asymmetric-to-pqc",
+      "count": 1,
+      "requires_verification_count": 1,
+      "assets": [
+        "RSA-2048"
+      ]
+    },
+    {
+      "finding_type": "classically-broken-primitive",
+      "severity": "high",
+      "title": "Algorithm already broken by classical cryptanalysis",
+      "explanation": "This asset uses an algorithm that is already broken or disallowed independently of any quantum threat. It should be replaced regardless of the post-quantum migration timeline.\n",
+      "remediation_ref": "replace-broken-primitive",
+      "count": 1,
+      "requires_verification_count": 0,
+      "assets": [
+        "SHA-1"
+      ]
+    },
+    {
+      "finding_type": "quantum-resistant-in-use",
+      "severity": "info",
+      "title": "Quantum-resistant algorithm in use",
+      "explanation": "This asset uses an algorithm with no known practical quantum attack at its parameters. It is recorded for inventory completeness and requires no remediation.\n",
+      "count": 1,
+      "requires_verification_count": 0,
+      "assets": [
+        "AES-256-GCM"
+      ]
+    },
+    {
+      "finding_type": "unclassified-crypto-asset",
+      "severity": "info",
+      "title": "Cryptographic asset could not be classified",
+      "explanation": "No classification entry matched this asset, usually because its algorithm, parameters, or OID are not recorded. Enrich the CBOM so the asset can be assessed.\n",
+      "remediation_ref": "identify-and-classify",
+      "count": 1,
+      "requires_verification_count": 1,
+      "assets": [
+        "TLS 1.3"
+      ]
+    }
+  ],
+  "affected_assets": [
+    {
+      "name": "RSA-2048",
+      "status": "shor_broken",
+      "severity": "critical",
+      "primitive": "pke",
+      "count": 1
+    },
+    {
+      "name": "SHA-1",
+      "status": "classically_broken",
+      "severity": "high",
+      "primitive": "hash",
+      "count": 1
+    }
+  ],
   "findings": [
     {
-      "rule_id": "BLP-ASYM-SHOR",
-      "finding_type": "quantum-vulnerable-asymmetric",
+      "rule_id": "BLP-KEX-SHOR",
+      "finding_type": "quantum-vulnerable-key-establishment",
       "severity": "critical",
       "asset_id": "0114ca6a0423d2f7",
-      "title": "Public-key algorithm broken by Shor's algorithm",
-      "explanation": "This asset uses a public-key algorithm whose security rests on factoring or discrete logarithms, both solved efficiently by Shor's algorithm on a cryptographically relevant quantum computer. Data protected by it is exposed to harvest-now-decrypt-later capture.\n",
+      "title": "Key establishment broken by Shor's algorithm (harvest-now-decrypt-later)",
+      "explanation": "This asset performs key establishment or public-key encryption whose security rests on factoring or discrete logarithms, both solved efficiently by Shor's algorithm on a cryptographically relevant quantum computer. An adversary can record the protected traffic today and decrypt it once such a computer exists (harvest-now-decrypt-later).\n",
       "remediation_ref": "migrate-asymmetric-to-pqc",
       "evidence_refs": [
         "bom.json#alg:rsa"
@@ -470,7 +538,7 @@
         "nist-ir-8547"
       ],
       "finding_types": [
-        "quantum-vulnerable-asymmetric"
+        "quantum-vulnerable-key-establishment"
       ],
       "finding_count": 1,
       "top_severity": "critical"

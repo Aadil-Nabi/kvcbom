@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Aadil-Nabi/kvcbom/pkg/model"
@@ -163,12 +164,58 @@ func TestBuild_PipelineShape(t *testing.T) {
 	if len(rep.Systems) != 1 || rep.Systems[0].System.ID != "web" {
 		t.Fatalf("expected one system view for web, got %+v", rep.Systems)
 	}
-	if rep.Framework != nil {
-		t.Error("baseline pack has no framework; framework view should be nil")
+	if len(rep.Frameworks) != 0 {
+		t.Error("baseline pack has no framework and no overlays were given; frameworks should be empty")
 	}
 	// Mosca aggregated for both scenarios.
 	if len(rep.Summary.MoscaByScenario) != 2 {
 		t.Errorf("expected 2 scenario outcomes, got %d", len(rep.Summary.MoscaByScenario))
+	}
+}
+
+func TestBuild_MultiFramework(t *testing.T) {
+	batch := &model.Batch{SourceFile: "bom.json", Assets: []model.Asset{
+		mkAsset(model.AssetAlgorithm, "RSA-2048", "", "pke", model.C3, "bom.json", "alg:rsa"),
+	}}
+	classifier, _ := rulepack.LoadEmbedded("baseline-pqc")
+	csa, _ := rulepack.LoadEmbedded("csa-qri-sg")
+	nist, _ := rulepack.LoadEmbedded("nist-ir-8547")
+
+	rep, err := report.Build(report.Input{
+		Batches: []*model.Batch{batch}, Pack: classifier.Pack, PackSHA256: "x",
+		Overlays: []*rulepack.Pack{csa.Pack, nist.Pack},
+		Tool:     report.ToolInfo{Name: "kvcbom", Version: "t"}, GeneratedAt: "2026-01-01T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Frameworks) != 2 {
+		t.Fatalf("expected 2 framework views, got %d", len(rep.Frameworks))
+	}
+	// Overlays are sorted by id; each must have mapped the RSA key-establishment finding.
+	for _, fw := range rep.Frameworks {
+		var kex *report.FrameworkMappingView
+		for i := range fw.Mappings {
+			if fw.Mappings[i].FindingType == "quantum-vulnerable-key-establishment" {
+				kex = &fw.Mappings[i]
+			}
+		}
+		if kex == nil || kex.FindingCount != 1 {
+			t.Errorf("%s: key-establishment mapping should count the RSA finding, got %+v", fw.ID, kex)
+		}
+		if !kex.Unverified {
+			t.Errorf("%s: overlay control should be marked unverified (TODO)", fw.ID)
+		}
+	}
+	// The report must warn that the framework mappings are unverified.
+	warned := false
+	for _, m := range rep.Warnings.Messages {
+		if strings.Contains(m, "framework control mappings are unverified") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("expected an unverified-framework warning, got %v", rep.Warnings.Messages)
 	}
 }
 

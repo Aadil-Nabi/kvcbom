@@ -76,6 +76,7 @@ type rawClass struct {
 	QuantumStatus string        `yaml:"quantum_status"`
 	Rationale     string        `yaml:"rationale"`
 	Source        string        `yaml:"source"`
+	Primitive     string        `yaml:"primitive"`
 	Deprecation   *rawMilestone `yaml:"deprecation"`
 	Disallowance  *rawMilestone `yaml:"disallowance"`
 	Match         rawMatch      `yaml:"match"`

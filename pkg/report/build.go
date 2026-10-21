@@ -16,12 +16,16 @@ import (
 // Input is everything Build needs to assemble a Report. The caller (the CLI) performs the
 // file reads and passes the parsed batches, context, and pack.
 type Input struct {
-	Title       string
-	Assessment  model.AssessmentMeta
-	Batches     []*model.Batch
-	Context     *model.Context // optional
-	Pack        *rulepack.Pack
-	PackSHA256  string
+	Title      string
+	Assessment model.AssessmentMeta
+	Batches    []*model.Batch
+	Context    *model.Context // optional
+	Pack       *rulepack.Pack
+	PackSHA256 string
+	// Overlays are additional framework packs whose control mappings are applied to the
+	// findings (e.g. a national regulator). Classification comes only from Pack; overlays
+	// contribute framework views, so one report can speak to several frameworks at once.
+	Overlays    []*rulepack.Pack
 	Tool        ToolInfo
 	GeneratedAt string // injected RFC3339 timestamp (deterministic)
 
@@ -75,6 +79,12 @@ func Build(in Input) (*Report, error) {
 	// Per-asset views and scores.
 	for _, a := range assets {
 		c := classByID[a.ID]
+		// When the CBOM did not record the algorithm's role, fall back to the role the
+		// classification implies (e.g. Diffie-Hellman → key-agreement). This lets the scorer
+		// recognise confidentiality mechanisms for harvest-now-decrypt-later detection.
+		if a.Primitive == "" && c.Result.Primitive != "" {
+			a.Primitive = c.Result.Primitive
+		}
 		rs := score.Asset(a, c.Result.Status, in.Context, weights)
 		rep.Assets = append(rep.Assets, AssetView{
 			Asset: a, Classified: c.Matched, Classification: c.Result, Score: rs,
@@ -82,14 +92,134 @@ func Build(in Input) (*Report, error) {
 	}
 	sort.Slice(rep.Assets, func(i, j int) bool { return rep.Assets[i].Asset.ID < rep.Assets[j].Asset.ID })
 
+	rep.FindingGroups = buildFindingGroups(rep)
+	rep.AffectedAssets = buildAffectedAssets(rep)
 	rep.Summary = buildSummary(rep, in.Context)
 	rep.Inventory = buildInventory(rep)
 	rep.Systems = buildSystems(rep, in.Context)
-	rep.Framework = buildFramework(in.Pack, rep.Findings)
+	rep.Frameworks = buildFrameworks(in.Pack, in.Overlays, rep.Findings)
 	rep.Remediation = buildRemediation(in.Pack, rep.Findings)
 	rep.Warnings = buildWarnings(rep, in.IngestWarnings)
 	rep.Appendix = buildAppendix(in.Pack, merged.Decisions, weights)
 	return rep, nil
+}
+
+func buildFindingGroups(rep *Report) []FindingGroup {
+	nameByID := make(map[string]string, len(rep.Assets))
+	for _, av := range rep.Assets {
+		n := av.Asset.Name
+		if n == "" {
+			n = av.Asset.ID
+		}
+		nameByID[av.Asset.ID] = n
+	}
+
+	type agg struct {
+		g     *FindingGroup
+		names map[string]struct{}
+	}
+	groups := map[string]*agg{}
+	var order []string
+	for _, f := range rep.Findings {
+		a := groups[f.FindingType]
+		if a == nil {
+			a = &agg{
+				g: &FindingGroup{
+					FindingType: f.FindingType, Severity: string(f.Severity),
+					Title: f.Title, Explanation: f.Explanation, RemediationRef: f.RemediationRef,
+				},
+				names: map[string]struct{}{},
+			}
+			groups[f.FindingType] = a
+			order = append(order, f.FindingType)
+		}
+		a.g.Count++
+		if f.RequiresVerification {
+			a.g.RequiresVerification++
+		}
+		a.names[nameByID[f.AssetID]] = struct{}{}
+	}
+
+	out := make([]FindingGroup, 0, len(order))
+	for _, ft := range order {
+		a := groups[ft]
+		a.g.Assets = sortedSet(a.names)
+		out = append(out, *a.g)
+	}
+	// Most severe first, then most-affected, then type name.
+	sort.Slice(out, func(i, j int) bool {
+		ri, rj := model.Severity(out[i].Severity).Rank(), model.Severity(out[j].Severity).Rank()
+		if ri != rj {
+			return ri < rj
+		}
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].FindingType < out[j].FindingType
+	})
+	return out
+}
+
+// buildAffectedAssets lists the actionable assets (a finding of medium or higher) with
+// their status and locations, worst-severity first, for the remediation-detail appendix.
+func buildAffectedAssets(rep *Report) []AffectedAsset {
+	worst := map[string]model.Severity{}
+	for _, f := range rep.Findings {
+		if f.Severity.Rank() > model.SeverityMedium.Rank() {
+			continue // skip low/info — not actionable detail
+		}
+		if cur, ok := worst[f.AssetID]; !ok || f.Severity.Rank() < cur.Rank() {
+			worst[f.AssetID] = f.Severity
+		}
+	}
+	// Group by algorithm (name) so one algorithm found at many endpoints is a single row.
+	type agg struct {
+		a    *AffectedAsset
+		locs map[string]struct{}
+	}
+	byName := map[string]*agg{}
+	var order []string
+	for _, av := range rep.Assets {
+		sev, ok := worst[av.Asset.ID]
+		if !ok {
+			continue
+		}
+		name := av.Asset.Name
+		if name == "" {
+			name = av.Asset.ID
+		}
+		g := byName[name]
+		if g == nil {
+			g = &agg{
+				a: &AffectedAsset{
+					Name: name, Status: string(av.Classification.Status),
+					Severity: string(sev), Primitive: av.Asset.Primitive,
+				},
+				locs: map[string]struct{}{},
+			}
+			byName[name] = g
+			order = append(order, name)
+		}
+		g.a.Count++
+		for _, l := range av.Asset.Locations {
+			g.locs[l] = struct{}{}
+		}
+	}
+
+	out := make([]AffectedAsset, 0, len(order))
+	for _, name := range order {
+		g := byName[name]
+		g.a.Locations = sortedSet(g.locs)
+		out = append(out, *g.a)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		ri, rj := model.Severity(out[i].Severity).Rank(), model.Severity(out[j].Severity).Rank()
+		if ri != rj {
+			return ri < rj
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
 }
 
 func buildSummary(rep *Report, ctx *model.Context) Summary {
@@ -118,14 +248,28 @@ func buildSummary(rep *Report, ctx *model.Context) Summary {
 			s.HNDLAssetCount++
 		}
 	}
+	// Top risks, de-duplicated by algorithm name so the same algorithm at many endpoints
+	// does not fill the list.
+	seenRisk := map[string]bool{}
 	for _, av := range ranked {
-		if len(s.TopRisks) >= 5 || av.Score.Final <= 0 {
-			break
+		if av.Score.Final <= 0 {
+			break // ranked is descending; the remainder score zero
 		}
+		name := av.Asset.Name
+		if name == "" {
+			name = av.Asset.ID
+		}
+		if seenRisk[name] {
+			continue
+		}
+		seenRisk[name] = true
 		s.TopRisks = append(s.TopRisks, RiskRef{
-			AssetID: av.Asset.ID, Name: av.Asset.Name,
+			AssetID: av.Asset.ID, Name: name,
 			QuantumStatus: string(av.Classification.Status), Final: av.Score.Final, HNDL: av.Score.HNDL,
 		})
+		if len(s.TopRisks) >= 5 {
+			break
+		}
 	}
 
 	// Mosca per scenario, aggregated across assets.
@@ -221,30 +365,42 @@ func buildSystems(rep *Report, ctx *model.Context) []SystemView {
 	return views
 }
 
-func buildFramework(p *rulepack.Pack, findings []model.Finding) *FrameworkView {
-	fw := p.Framework()
-	if fw.ID == "" {
-		return nil
-	}
+// buildFrameworks assembles a view for the classifier pack's own framework (if any) plus
+// one for each overlay pack, so a single report can map findings onto several frameworks.
+func buildFrameworks(p *rulepack.Pack, overlays []*rulepack.Pack, findings []model.Finding) []FrameworkView {
 	countByType := map[string]int{}
 	for _, f := range findings {
 		countByType[f.FindingType]++
 	}
-	view := &FrameworkView{ID: fw.ID, Name: fw.Name}
-	for _, m := range fw.Mappings {
-		view.Mappings = append(view.Mappings, FrameworkMappingView{
-			FindingType: m.FindingType, ControlID: m.ControlID, ControlTitle: m.ControlTitle,
-			Source: m.Source, FindingCount: countByType[m.FindingType],
-			Unverified: containsTODO(m.ControlID) || containsTODO(m.ControlTitle),
-		})
-	}
-	sort.Slice(view.Mappings, func(i, j int) bool {
-		if view.Mappings[i].FindingType != view.Mappings[j].FindingType {
-			return view.Mappings[i].FindingType < view.Mappings[j].FindingType
+
+	var views []FrameworkView
+	add := func(fw rulepack.Framework) {
+		if fw.ID == "" {
+			return
 		}
-		return view.Mappings[i].ControlID < view.Mappings[j].ControlID
-	})
-	return view
+		view := FrameworkView{ID: fw.ID, Name: fw.Name}
+		for _, m := range fw.Mappings {
+			view.Mappings = append(view.Mappings, FrameworkMappingView{
+				FindingType: m.FindingType, ControlID: m.ControlID, ControlTitle: m.ControlTitle,
+				Source: m.Source, FindingCount: countByType[m.FindingType],
+				Unverified: containsTODO(m.ControlID) || containsTODO(m.ControlTitle),
+			})
+		}
+		sort.Slice(view.Mappings, func(i, j int) bool {
+			if view.Mappings[i].FindingType != view.Mappings[j].FindingType {
+				return view.Mappings[i].FindingType < view.Mappings[j].FindingType
+			}
+			return view.Mappings[i].ControlID < view.Mappings[j].ControlID
+		})
+		views = append(views, view)
+	}
+
+	add(p.Framework())
+	for _, o := range overlays {
+		add(o.Framework())
+	}
+	sort.SliceStable(views, func(i, j int) bool { return views[i].ID < views[j].ID })
+	return views
 }
 
 func buildRemediation(p *rulepack.Pack, findings []model.Finding) []RemediationItem {
@@ -309,6 +465,25 @@ func buildWarnings(rep *Report, ingestWarnings []string) Warnings {
 	if w.UnverifiedRuleContent {
 		w.Messages = append(w.Messages, "the rule pack contains unverified content (draft/vendor status or TODO(source) placeholders); verify cited controls before relying on them")
 	}
+
+	// Framework overlays may carry unfilled control placeholders even when the classifier is
+	// final — surface that so a reader does not treat the regulator mapping as authoritative.
+	var unverifiedFrameworks []string
+	for _, fw := range rep.Frameworks {
+		for _, m := range fw.Mappings {
+			if m.Unverified {
+				unverifiedFrameworks = append(unverifiedFrameworks, fw.Name)
+				break
+			}
+		}
+	}
+	if len(unverifiedFrameworks) > 0 {
+		w.UnverifiedRuleContent = true
+		w.Messages = append(w.Messages, fmt.Sprintf(
+			"framework control mappings are unverified (TODO(source) placeholders) for: %s; "+
+				"fill them from the official source before presenting these as compliance claims",
+			strings.Join(unverifiedFrameworks, ", ")))
+	}
 	if w.LowConfidenceCount > 0 {
 		w.Messages = append(w.Messages, fmt.Sprintf("%d finding(s) rest on low-confidence evidence (C1/C2) and are marked as requiring verification", w.LowConfidenceCount))
 	}
@@ -319,7 +494,10 @@ func buildWarnings(rep *Report, ingestWarnings []string) Warnings {
 		}
 	}
 	if unclassified > 0 {
-		w.Messages = append(w.Messages, fmt.Sprintf("%d asset(s) could not be classified from the available data", unclassified))
+		w.Messages = append(w.Messages, fmt.Sprintf(
+			"%d asset(s) could not be classified — typically protocol endpoints (TLS/SSH/IKE) and "+
+				"key containers (e.g. JKS, PKCS#12) that do not name a single algorithm, rather than assessment failures; "+
+				"enrich the CBOM to classify any that are genuine algorithms", unclassified))
 	}
 	return w
 }

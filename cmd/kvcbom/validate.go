@@ -49,6 +49,7 @@ func newValidateCmd() *cobra.Command {
 		strict      bool
 		asJSON      bool
 		maxBytes    int64
+		cbomMapping string
 	)
 
 	cmd := &cobra.Command{
@@ -63,12 +64,21 @@ func newValidateCmd() *cobra.Command {
 				return cli.Codedf(cli.ExitUsage, "at least one --cbom is required")
 			}
 
+			var cbomMap *cbom.Mapping
+			if cbomMapping != "" {
+				var err error
+				cbomMap, err = cbom.LoadMapping(cbomMapping)
+				if err != nil {
+					return cli.Coded(cli.ExitValidation, err)
+				}
+			}
+
 			rep := validateReport{Tool: "kvcbom", Version: version.Version, OK: true}
 
 			for _, path := range cbomFiles {
 				fr := validateFileReport{File: path, SchemaValid: true}
 
-				res, err := cbom.IngestFile(path, cbom.Options{MaxInputBytes: maxBytes, ValidateSchema: true})
+				res, err := cbom.IngestFile(path, cbom.Options{MaxInputBytes: maxBytes, ValidateSchema: true, Mapping: cbomMap})
 				if err != nil {
 					fr.SchemaValid = false
 					fr.SchemaError = err.Error()
@@ -141,6 +151,7 @@ func newValidateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&strict, "strict", false, "treat completeness warnings as validation failures")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit machine-readable JSON to stdout")
 	cmd.Flags().Int64Var(&maxBytes, "max-bytes", 0, "maximum input file size in bytes (0 = default)")
+	cmd.Flags().StringVar(&cbomMapping, "cbom-mapping", "", "path to a CBOM extension-mapping YAML (maps vendor property keys to the algorithm)")
 	return cmd
 }
 

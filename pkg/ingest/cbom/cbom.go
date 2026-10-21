@@ -25,14 +25,21 @@ type Options struct {
 	DefaultConfidence model.ConfLevel
 	// ValidateSchema runs JSON-Schema validation (JSON inputs only) before decoding.
 	ValidateSchema bool
+	// Mapping configures how vendor-specific CBOM extensions are read; nil uses the default.
+	Mapping *Mapping
 }
 
 func (o Options) withDefaults() Options {
 	if o.MaxInputBytes <= 0 {
 		o.MaxInputBytes = safety.DefaultMaxInputBytes
 	}
+	o.Mapping = o.Mapping.withDefaults()
 	if !o.DefaultConfidence.Valid() {
-		o.DefaultConfidence = model.C2
+		// A CBOM records crypto a scanner observed in a live service or artifact, so its
+		// evidence is treated as C3 (observed) by default — not C2. This keeps the
+		// "requires verification" flag for genuinely weak inputs (e.g. manual register
+		// entries, which default to C1) rather than firing on every scanned finding.
+		o.DefaultConfidence = model.C3
 	}
 	return o
 }
@@ -185,7 +192,21 @@ func buildAsset(c *cdx.Component, sourceFile string, opts Options) model.Asset {
 		}
 	}
 
-	a.Locations = occurrenceLocations(c)
+	locations := occurrenceLocations(c)
+
+	// Extension properties. Some scanners record the algorithm here (e.g. `qs:algorithm`)
+	// rather than in the component name, which instead holds the location/endpoint. The
+	// Mapping decides which property keys carry the algorithm (vendor-agnostic). When one is
+	// present we adopt it as the asset's identity for classification and demote the original
+	// name to a location, so the report groups by algorithm while recording where it was seen.
+	a.Properties = readProperties(c)
+	if algo := opts.Mapping.algorithmFromProperties(a.Properties); algo != "" {
+		if a.Name != "" && !strings.EqualFold(a.Name, algo) {
+			locations = append(locations, a.Name)
+		}
+		a.Name = algo
+	}
+	a.Locations = dedupeSorted(locations)
 
 	a.Evidence = []model.Evidence{{
 		SourceType: model.SourceScannerCBOM,
@@ -196,6 +217,45 @@ func buildAsset(c *cdx.Component, sourceFile string, opts Options) model.Asset {
 
 	a.ID = model.AssetIdentity(a)
 	return a
+}
+
+// readProperties copies a component's extension properties onto a sorted, trimmed slice.
+// Interpreting them (e.g. which key holds the algorithm) is the Mapping's job, keeping this
+// function a pure, format-level reader.
+func readProperties(c *cdx.Component) []model.Property {
+	if c.Properties == nil {
+		return nil
+	}
+	var out []model.Property
+	for _, p := range *c.Properties {
+		k := strings.TrimSpace(p.Name)
+		if k == "" {
+			continue
+		}
+		out = append(out, model.Property{Key: k, Value: strings.TrimSpace(p.Value)})
+	}
+	sortProperties(out)
+	return out
+}
+
+func dedupeSorted(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	var out []string
+	for _, s := range in {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func mapAssetType(t cdx.CryptoAssetType) model.AssetType {

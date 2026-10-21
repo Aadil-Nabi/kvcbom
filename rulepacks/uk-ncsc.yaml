@@ -1,0 +1,41 @@
+schema_version: 1
+id: uk-ncsc
+version: 0.1.0
+name: UK NCSC post-quantum mapping (framework overlay)
+description: >
+  Framework overlay that maps kvcbom's finding types onto UK National Cyber Security Centre
+  (NCSC) post-quantum migration guidance. It performs no classification of its own — run it
+  with --framework alongside a classifier such as baseline-pqc. All control references are
+  TODO(source) placeholders to be filled and verified from the official NCSC guidance; the
+  overlay is draft until that is done.
+status: draft
+
+sources:
+  - id: ncsc-doc
+    title: "UK NCSC — Post-Quantum Cryptography migration guidance"
+    url: "TODO(source): official UK NCSC post-quantum guidance URL"
+    status: draft
+    retrieved_date: "2026-10-21"
+
+classifications: []
+
+framework:
+  id: uk-ncsc
+  name: UK NCSC post-quantum migration guidance
+  mappings:
+    - finding_type: quantum-vulnerable-key-establishment
+      control_id: "TODO(source): NCSC guidance for quantum-vulnerable key establishment"
+      control_title: "TODO(source): guidance text and milestone"
+      source: ncsc-doc
+    - finding_type: quantum-vulnerable-signature
+      control_id: "TODO(source): NCSC guidance for quantum-vulnerable signatures"
+      control_title: "TODO(source): guidance text and milestone"
+      source: ncsc-doc
+    - finding_type: classically-broken-primitive
+      control_id: "TODO(source): NCSC guidance on deprecated algorithms"
+      control_title: "TODO(source): guidance text"
+      source: ncsc-doc
+    - finding_type: symmetric-strength-reduced
+      control_id: "TODO(source): NCSC guidance on symmetric key strength"
+      control_title: "TODO(source): guidance text"
+      source: ncsc-doc

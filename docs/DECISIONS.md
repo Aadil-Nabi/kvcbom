@@ -5,6 +5,77 @@ Status: `accepted` | `proposed` | `superseded`.
 
 ---
 
+## ADR-0017 — Multi-framework reporting via classifier + regulator overlays
+- **Status:** accepted
+- **Context:** customers need the report mapped to their national regulator (CSA SG, ENISA, BSI,
+  NCSC…), and often to more than one body at once. The classification (what is quantum-broken)
+  is universal NIST-grounded fact; only the control *citation* differs per regulator. The M2
+  framework packs bundled their own (compact, inferior) classification, duplicating logic.
+- **Decision:** split packs into two kinds. A **classifier** (`baseline-pqc`) owns the
+  classification table + rules and emits a **canonical finding-type vocabulary**
+  (`quantum-vulnerable-key-establishment`, `-signature`, `-asymmetric`, `classically-broken-primitive`,
+  `symmetric-strength-reduced`, `unclassified-crypto-asset`, `quantum-resistant-in-use`). A
+  **framework overlay** carries no classifications — only `framework.mappings` keyed by that
+  vocabulary. `report --rulepack <classifier> --framework <overlay>…` applies one classification
+  and N regulator views; `Report.Frameworks` is a list, rendered as multiple sections (HTML/MD/PDF).
+  The CLI guards against using an overlay as the classifier (clear error). The three M2 framework
+  packs were converted to overlays; `enisa-eu` and `uk-ncsc` overlays were scaffolded. All
+  control text stays `TODO(source):` and the report's warnings now flag unverified **overlay**
+  content, not just the classifier's (so a draft regulator mapping can't be mistaken for a
+  verified compliance claim). Per-regulator control text must be filled and verified by a human
+  from primary documents — never fabricated.
+- **Consequences:** one classification source of truth; adding a regulator is a pure content
+  pack. Overlays are not standalone classifiers by design. (Surfaced and fixed here: fpdf emitted
+  the font dictionary in map order — `SetCatalogSort(true)` restores byte-reproducible PDFs.)
+
+## ADR-0016 — Scanner-agnostic ingest: version-selected schema (1.6 + 1.7), configurable property mapping, family-aware classification
+- **Status:** accepted
+- **Context:** the tool must accept CBOMs from any vendor (Keyfactor AgileSec, QuSecure, etc.)
+  and support CycloneDX 1.7, which many tools now emit. Three gaps: (a) we only strict-validated
+  1.6; (b) 1.7 populates `algorithmProperties.algorithmFamily` which our classifier ignored;
+  (c) vendors record the algorithm under different property keys.
+- **Decision:**
+  - **Version-selected schema.** Embed the official 1.7 schema (plus its new
+    `cryptography-defs.schema.json`) alongside 1.6; `ValidateSchema` reads the document's
+    `specVersion` and validates against the matching compiled schema. Adding a future version is
+    one entry in `bomSchemaIDs` + embedding its file — no logic change (open/closed). All
+    schemas compile on one compiler so cross-refs (SPDX/JSF) resolve.
+  - **Configurable property mapping.** A `Mapping` strategy object (`cbom.Mapping`, default +
+    `--cbom-mapping` YAML) lists the property keys whose value is the algorithm, matched exactly
+    or as a `*:suffix` wildcard. The ingester delegates "which property is the algorithm" to it,
+    so a new vendor convention is a config change. `readProperties` now only reads/sorts
+    (format-level); interpretation lives in the mapping (SRP).
+  - **Family-aware classification.** Classification name-patterns now match the asset Name *or*
+    AlgorithmFamily, so a 1.7 CBOM that names only the family still classifies — no pack changes.
+- **Consequences:** standards-compliant vendor CBOMs (richer than the nmap sample) classify more
+  cleanly; 1.7 files validate without the tolerance warning; the 1.7 schema is strict (e.g.
+  namespaced curves like `nist/P-256`). SOLID review done alongside: `model` stays dependency-free,
+  ingest remains the sole anti-corruption layer for cyclonedx-go, packs stay the open/closed
+  extension point, interfaces only where multiple impls exist.
+
+## ADR-0015 — Ingest reads CycloneDX component `properties`; adopts an algorithm-bearing property as the asset identity
+- **Status:** accepted
+- **Context:** real scanner CBOMs (validated against a 403 KB nmap-sourced sample) name each
+  crypto-asset component by its **endpoint/location** (e.g. `172.31.100.107:22`) and leave the
+  standard `name`/`cryptoProperties`/`oid` empty, recording the actual algorithm in the
+  CycloneDX `properties` extension array (e.g. `qs:algorithm = diffie-hellman-group18-sha512`).
+  The ingester ignored `properties`, so every asset's identity was the endpoint and everything
+  classified as `unknown` — the tool was useless on this (common) shape of real data.
+- **Decision:** the CBOM ingester now copies component `properties` onto the asset
+  (`Asset.Properties`, sorted, for traceability) and, when a property's key is `algorithm` or
+  ends with `:algorithm` (case-insensitive, vendor-neutral), **adopts its value as the asset's
+  name/identity** and demotes the original component name to a location. Classification is
+  unchanged — the existing name-pattern matchers now see the real algorithm string. This also
+  fixes over-merging: distinct algorithms on one endpoint are now distinct assets.
+- **Consequences:** the tool produces a real assessment of scanner output (on the sample, 129
+  Shor-broken / 32 classically-broken / 23 Grover-weakened / 78 quantum-resistant with
+  baseline-pqc; the ~90 remaining unknowns are legitimately protocol endpoints, key containers
+  like JKS/PKCS#12, and non-crypto SSH tokens, not misses). We classify independently from the
+  algorithm string and do **not** trust the scanner's own `qs:quantum_risk` label. Added
+  ChaCha20/ChaCha20-Poly1305 to baseline-pqc (a real coverage gap surfaced here). Inferring a
+  key-establishment primitive from the algorithm name (to enable HNDL without explicit
+  `cryptoProperties`) is a possible future enhancement.
+
 ## ADR-0014 — `report` tolerates schema non-conformance (warns); `validate` stays strict
 - **Status:** accepted
 - **Context:** real-world "CycloneDX 1.6" CBOMs from scanners often carry a stray 1.7 field

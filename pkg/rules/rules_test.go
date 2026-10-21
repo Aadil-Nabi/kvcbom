@@ -29,8 +29,11 @@ func findingFor(res *Result, assetID string) *model.Finding {
 func TestEvaluate_BaselineFindings(t *testing.T) {
 	p := baseline(t)
 	assets := []model.Asset{
-		{ID: "rsa", Name: "RSA-2048", OID: "1.2.840.113549.1.1.1", Primitive: "pke",
+		// RSA has no primitive set; the classification implies pke -> key establishment.
+		{ID: "rsa", Name: "RSA-2048", OID: "1.2.840.113549.1.1.1",
 			Evidence: []model.Evidence{{SourceType: model.SourceScannerCBOM, Confidence: model.C3}}},
+		// ECDSA is a signature -> the forgery (not HNDL) finding, high not critical.
+		{ID: "ecdsa", Name: "ECDSA", Evidence: []model.Evidence{{Confidence: model.C3}}},
 		{ID: "sha1", Name: "SHA-1", Evidence: []model.Evidence{{Confidence: model.C3}}},
 		{ID: "aes128", Name: "AES-128-CBC", Evidence: []model.Evidence{{Confidence: model.C3}}},
 		{ID: "mlkem", Name: "ML-KEM-768", Evidence: []model.Evidence{{Confidence: model.C3}}},
@@ -46,7 +49,8 @@ func TestEvaluate_BaselineFindings(t *testing.T) {
 		findingType string
 		severity    model.Severity
 	}{
-		"rsa":    {"quantum-vulnerable-asymmetric", model.SeverityCritical},
+		"rsa":    {"quantum-vulnerable-key-establishment", model.SeverityCritical},
+		"ecdsa":  {"quantum-vulnerable-signature", model.SeverityHigh},
 		"sha1":   {"classically-broken-primitive", model.SeverityHigh},
 		"aes128": {"symmetric-strength-reduced", model.SeverityMedium},
 		"mlkem":  {"quantum-resistant-in-use", model.SeverityInfo},

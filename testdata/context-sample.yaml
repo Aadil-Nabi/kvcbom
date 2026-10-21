@@ -1,0 +1,55 @@
+# Sample assessment context for the bundled scanner CBOM (testdata/cbom-PT8DJL3B9Z-*.cdx.json).
+# It maps scanner endpoints to business systems by PORT so the Mosca / harvest-now-decrypt-later
+# (HNDL) scoring can run. Copy and adapt the systems, data classes, and CRQC assumptions to a
+# real environment. CRQC years are assumptions you choose — not facts kvcbom asserts.
+schema_version: 1
+meta:
+  organisation: Example Corp
+  assessor: Security Team
+  scope: Internet-facing and internal services discovered by the network scan
+
+global_migration_time_years: 5
+
+crqc_scenarios:
+  - { name: optimistic,  years_until: 20 }
+  - { name: central,     years_until: 12 }
+  - { name: pessimistic, years_until: 7 }
+
+data_classes:
+  - { id: customer-pii, name: Customer personal data, confidentiality_lifetime_years: 15 }
+  - { id: credentials,  name: Administrative credentials, confidentiality_lifetime_years: 10 }
+  - { id: source-code,  name: Proprietary source code, confidentiality_lifetime_years: 7 }
+
+systems:
+  - id: customer-web
+    name: Customer-facing web tier
+    owner: platform-team
+    criticality: critical
+    crown_jewel: true
+    data_class_refs: [customer-pii]
+    migration_time_years: 4
+  - id: databases
+    name: Databases
+    owner: data-team
+    criticality: critical
+    data_class_refs: [customer-pii]
+  - id: admin-access
+    name: Administrative SSH access
+    owner: infra-team
+    criticality: high
+    data_class_refs: [credentials]
+  - id: source-control
+    name: Source-control repositories
+    owner: devex-team
+    criticality: medium
+    data_class_refs: [source-code]
+
+link_rules:
+  - system_ref: customer-web
+    location_patterns: [":443$", ":8443$"]
+  - system_ref: databases
+    location_patterns: [":3306$", ":5432$"]
+  - system_ref: admin-access
+    location_patterns: [":22$"]
+  - system_ref: source-control
+    location_patterns: ["(?i)\\.git"]

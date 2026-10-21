@@ -85,7 +85,18 @@ type Asset struct {
 	SystemRefs    []string `json:"system_refs,omitempty"`
 	DataClassRefs []string `json:"data_class_refs,omitempty"`
 
+	// Properties are extension name/value pairs carried on the source component (sorted).
+	Properties []Property `json:"properties,omitempty"`
+
 	Evidence []Evidence `json:"evidence"`
+}
+
+// Property is a name/value extension pair from a CBOM component. Scanners record data
+// outside the standard crypto fields here (e.g. a `qs:algorithm` entry naming the
+// algorithm); it is preserved for traceability.
+type Property struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // DependencyEdge preserves a CBOM dependency relationship (e.g. protocol → cipher

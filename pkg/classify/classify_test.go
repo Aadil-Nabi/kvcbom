@@ -82,6 +82,16 @@ func TestClassify_KeyBits(t *testing.T) {
 	}
 }
 
+func TestClassify_NamePatternMatchesAlgorithmFamily(t *testing.T) {
+	// A CycloneDX 1.7 asset may carry the algorithm only in AlgorithmFamily, with a generic
+	// component name. The name pattern must still match via the family.
+	c := New("p", "1.0.0", []Entry{nameEntry("ecdsa", StatusShorBroken, "(?i)ecdsa")})
+	res, ok := c.Classify(model.Asset{Name: "api.example.com key", AlgorithmFamily: "ECDSA"})
+	if !ok || res.EntryID != "ecdsa" {
+		t.Errorf("expected match via algorithm family, got %+v ok=%v", res, ok)
+	}
+}
+
 func TestClassify_EmptyMatchNeverApplies(t *testing.T) {
 	c := New("p", "1.0.0", []Entry{{ID: "catch-all", Status: StatusShorBroken, SourceID: "s"}})
 	if _, ok := c.Classify(model.Asset{Name: "anything"}); ok {

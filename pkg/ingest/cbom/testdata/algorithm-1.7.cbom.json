@@ -1,0 +1,22 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "alg:sig-key",
+      "name": "api.example.com signing key",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "algorithmFamily": "ECDSA",
+          "ellipticCurve": "nist/P-256",
+          "cryptoFunctions": ["sign", "verify"]
+        },
+        "oid": "1.2.840.10045.4.3.2"
+      }
+    }
+  ]
+}

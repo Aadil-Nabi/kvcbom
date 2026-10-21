@@ -72,9 +72,10 @@ type rawDataClass struct {
 }
 
 type rawLinkRule struct {
-	SystemRef    string   `yaml:"system_ref"`
-	BOMRefs      []string `yaml:"bom_refs"`
-	NamePatterns []string `yaml:"name_patterns"`
+	SystemRef        string   `yaml:"system_ref"`
+	BOMRefs          []string `yaml:"bom_refs"`
+	NamePatterns     []string `yaml:"name_patterns"`
+	LocationPatterns []string `yaml:"location_patterns"`
 }
 
 // LoadFile reads, schema-validates, and parses a context file.
@@ -129,7 +130,8 @@ func build(r *rawContext) *model.Context {
 	}
 	for _, l := range r.LinkRules {
 		c.LinkRules = append(c.LinkRules, model.LinkRule{
-			SystemRef: l.SystemRef, BOMRefs: l.BOMRefs, NamePatterns: l.NamePatterns,
+			SystemRef: l.SystemRef, BOMRefs: l.BOMRefs,
+			NamePatterns: l.NamePatterns, LocationPatterns: l.LocationPatterns,
 		})
 	}
 	return c
@@ -198,9 +200,10 @@ func Link(assets []model.Asset, ctx *model.Context) ([]model.Asset, error) {
 	}
 	// Pre-compile name patterns per rule.
 	type compiledRule struct {
-		systemRef string
-		bomRefs   map[string]struct{}
-		patterns  []*regexp.Regexp
+		systemRef   string
+		bomRefs     map[string]struct{}
+		patterns    []*regexp.Regexp
+		locPatterns []*regexp.Regexp
 	}
 	rules := make([]compiledRule, 0, len(ctx.LinkRules))
 	for i, lr := range ctx.LinkRules {
@@ -215,6 +218,13 @@ func Link(assets []model.Asset, ctx *model.Context) ([]model.Asset, error) {
 			}
 			cr.patterns = append(cr.patterns, re)
 		}
+		for _, p := range lr.LocationPatterns {
+			re, err := regexp.Compile(p)
+			if err != nil {
+				return nil, fmt.Errorf("link rule #%d: invalid location pattern %q: %w", i+1, p, err)
+			}
+			cr.locPatterns = append(cr.locPatterns, re)
+		}
 		rules = append(rules, cr)
 	}
 
@@ -225,7 +235,7 @@ func Link(assets []model.Asset, ctx *model.Context) ([]model.Asset, error) {
 		sysSet := toSet(a.SystemRefs)
 		dcSet := toSet(a.DataClassRefs)
 		for _, cr := range rules {
-			if !ruleMatches(cr.bomRefs, cr.patterns, a) {
+			if !ruleMatches(cr.bomRefs, cr.patterns, cr.locPatterns, a) {
 				continue
 			}
 			sys, ok := ctx.SystemByID(cr.systemRef)
@@ -243,7 +253,7 @@ func Link(assets []model.Asset, ctx *model.Context) ([]model.Asset, error) {
 	return out, nil
 }
 
-func ruleMatches(bomRefs map[string]struct{}, patterns []*regexp.Regexp, a *model.Asset) bool {
+func ruleMatches(bomRefs map[string]struct{}, patterns, locPatterns []*regexp.Regexp, a *model.Asset) bool {
 	for _, ev := range a.Evidence {
 		if _, ok := bomRefs[ev.BOMRef]; ok && ev.BOMRef != "" {
 			return true
@@ -253,6 +263,13 @@ func ruleMatches(bomRefs map[string]struct{}, patterns []*regexp.Regexp, a *mode
 	if name != "" {
 		for _, re := range patterns {
 			if re.MatchString(name) {
+				return true
+			}
+		}
+	}
+	for _, loc := range a.Locations {
+		for _, re := range locPatterns {
+			if re.MatchString(loc) {
 				return true
 			}
 		}

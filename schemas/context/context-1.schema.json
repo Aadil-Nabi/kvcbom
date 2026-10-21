@@ -69,7 +69,8 @@
         "properties": {
           "system_ref": { "type": "string", "minLength": 1 },
           "bom_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "name_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          "name_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "location_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
         }
       }
     }

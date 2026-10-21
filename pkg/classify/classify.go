@@ -106,6 +106,7 @@ type Entry struct {
 	Status       QuantumStatus
 	Rationale    string
 	SourceID     string
+	Primitive    string // the algorithm's role (e.g. key-agree, signature, pke); optional
 	Deprecation  *Milestone
 	Disallowance *Milestone
 	Match        Match
@@ -166,7 +167,11 @@ func (e *Entry) match(a model.Asset) (bool, []string) {
 		dims = append(dims, "key_bits")
 	}
 	if len(e.Match.NamePatterns) > 0 {
-		if !anyMatch(e.Match.NamePatterns, a.Name) {
+		// Match against the component name and the algorithm family. CycloneDX 1.6 carries no
+		// family, but 1.7 populates algorithmProperties.algorithmFamily, so honouring both lets
+		// the same name pattern classify richer 1.7 CBOMs that name the family rather than the
+		// component.
+		if !anyMatch(e.Match.NamePatterns, a.Name) && !anyMatch(e.Match.NamePatterns, a.AlgorithmFamily) {
 			return false, nil
 		}
 		dims = append(dims, "name")
@@ -192,6 +197,7 @@ type Result struct {
 	EntryID      string        `json:"entry_id,omitempty"`
 	MatchedBy    []string      `json:"matched_by,omitempty"`
 	SourceID     string        `json:"source_id,omitempty"`
+	Primitive    string        `json:"primitive,omitempty"`
 	Rationale    string        `json:"rationale,omitempty"`
 	Deprecation  *Milestone    `json:"deprecation,omitempty"`
 	Disallowance *Milestone    `json:"disallowance,omitempty"`
@@ -243,6 +249,7 @@ func (c *Classifier) Classify(a model.Asset) (Result, bool) {
 		EntryID:      e.ID,
 		MatchedBy:    bestDims,
 		SourceID:     e.SourceID,
+		Primitive:    e.Primitive,
 		Rationale:    e.Rationale,
 		Deprecation:  e.Deprecation,
 		Disallowance: e.Disallowance,

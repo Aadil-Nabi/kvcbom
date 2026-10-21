@@ -79,30 +79,35 @@ classifications:
   # --- Post-quantum standards (listed first so order breaks any name-pattern ties) ---
   - id: ml-kem
     quantum_status: quantum_resistant
+    primitive: kem
     rationale: "Module-lattice KEM standardised as ML-KEM in FIPS 203; no known practical quantum attack."
     source: fips-203
     match:
       name_patterns: ["(?i)ml[-_ ]?kem", "(?i)kyber"]
   - id: ml-dsa
     quantum_status: quantum_resistant
+    primitive: signature
     rationale: "Module-lattice signature standardised as ML-DSA in FIPS 204."
     source: fips-204
     match:
       name_patterns: ["(?i)ml[-_ ]?dsa", "(?i)dilithium"]
   - id: slh-dsa
     quantum_status: quantum_resistant
+    primitive: signature
     rationale: "Stateless hash-based signature standardised as SLH-DSA in FIPS 205."
     source: fips-205
     match:
       name_patterns: ["(?i)slh[-_ ]?dsa", "(?i)sphincs"]
   - id: fn-dsa-falcon
     quantum_status: quantum_resistant
+    primitive: signature
     rationale: "FALCON (to be standardised as FN-DSA) is a NIST-selected lattice signature; no known practical quantum attack. Standard in progress (FIPS 206)."
     source: nist-pqc
     match:
       name_patterns: ["(?i)falcon", "(?i)fn[-_ ]?dsa"]
   - id: stateful-hash-sig
     quantum_status: quantum_resistant
+    primitive: signature
     rationale: "LMS/HSS and XMSS/XMSS-MT stateful hash-based signatures are approved by NIST SP 800-208 and rely only on hash-function security."
     source: sp-800-208
     match:
@@ -111,24 +116,28 @@ classifications:
   # --- Classically broken (win over generic symmetric/hash fallbacks) ---
   - id: md5
     quantum_status: classically_broken
+    primitive: hash
     rationale: "MD5 is collision-broken by classical cryptanalysis and unfit for security use."
     source: wang-md5-2005
     match:
       name_patterns: ["(?i)\\bmd5\\b"]
   - id: sha1
     quantum_status: classically_broken
+    primitive: hash
     rationale: "SHA-1 is collision-broken (SHAttered) and disallowed by NIST SP 800-131A."
     source: shattered-2017
     match:
       name_patterns: ["(?i)sha[-_ ]?1\\b"]
   - id: des-family
     quantum_status: classically_broken
+    primitive: block-cipher
     rationale: "Single DES (56-bit) and Triple DES/TDEA are disallowed by NIST SP 800-131A; 3DES is further weakened by the Sweet32 birthday attack on its 64-bit block."
     source: sp-800-131a
     match:
       name_patterns: ["(?i)\\bdes\\b", "(?i)3des", "(?i)triple[-_ ]?des", "(?i)\\btdea\\b"]
   - id: rc4
     quantum_status: classically_broken
+    primitive: stream-cipher
     rationale: "RC4 has exploitable keystream biases and is prohibited for TLS by RFC 7465."
     source: rfc-7465
     match:
@@ -137,48 +146,56 @@ classifications:
   # --- Shor-broken public-key algorithms ---
   - id: rsa
     quantum_status: shor_broken
+    primitive: pke
     rationale: "RSA security rests on integer factorisation, which Shor's algorithm solves in polynomial time on a CRQC."
     source: shor-1997
     match:
       oids: ["1.2.840.113549.1.1.1"]
   - id: rsa-by-name
     quantum_status: shor_broken
+    primitive: pke
     rationale: "RSA security rests on integer factorisation, broken by Shor's algorithm."
     source: shor-1997
     match:
       name_patterns: ["(?i)\\brsa"]
   - id: dsa
     quantum_status: shor_broken
+    primitive: signature
     rationale: "DSA security rests on the finite-field discrete-logarithm problem, broken by Shor's algorithm."
     source: shor-1997
     match:
       oids: ["1.2.840.10040.4.1"]
   - id: dsa-by-name
     quantum_status: shor_broken
+    primitive: signature
     rationale: "DSA security rests on the discrete-logarithm problem, broken by Shor's algorithm."
     source: shor-1997
     match:
       name_patterns: ["(?i)\\bdsa\\b"]
   - id: ecdsa
     quantum_status: shor_broken
+    primitive: signature
     rationale: "ECDSA security rests on the elliptic-curve discrete-logarithm problem, broken by Shor's algorithm."
     source: shor-1997
     match:
       name_patterns: ["(?i)ecdsa"]
   - id: eddsa
     quantum_status: shor_broken
+    primitive: signature
     rationale: "EdDSA (Ed25519/Ed448) is an elliptic-curve signature; the ECDLP it relies on is broken by Shor's algorithm."
     source: shor-1997
     match:
       name_patterns: ["(?i)\\bed(dsa|25519|448)\\b"]
   - id: ecc-public-key
     quantum_status: shor_broken
+    primitive: key-agree
     rationale: "Elliptic-curve public-key cryptography relies on the ECDLP, broken by Shor's algorithm."
     source: shor-1997
     match:
       oids: ["1.2.840.10045.2.1"]
   - id: ecc-by-curve
     quantum_status: shor_broken
+    primitive: key-agree
     rationale: "Named elliptic curves imply elliptic-curve public-key cryptography, whose ECDLP is broken by Shor's algorithm."
     source: shor-1997
     match:
@@ -198,12 +215,14 @@ classifications:
         - "ed448"
   - id: ecies
     quantum_status: shor_broken
+    primitive: pke
     rationale: "ECIES is elliptic-curve based; its ECDLP security is broken by Shor's algorithm."
     source: shor-1997
     match:
       name_patterns: ["(?i)ecies"]
   - id: diffie-hellman
     quantum_status: shor_broken
+    primitive: key-agree
     rationale: "Diffie-Hellman key agreement (finite-field or elliptic-curve) relies on the discrete-logarithm problem, broken by Shor's algorithm."
     source: shor-1997
     match:
@@ -217,6 +236,7 @@ classifications:
         - "(?i)curve25519"
   - id: elgamal
     quantum_status: shor_broken
+    primitive: pke
     rationale: "ElGamal encryption relies on the discrete-logarithm problem, broken by Shor's algorithm."
     source: shor-1997
     match:
@@ -225,6 +245,7 @@ classifications:
   # --- Symmetric ciphers: Grover halves the search space (key size matters) ---
   - id: aes-128-by-keysize
     quantum_status: grover_weakened
+    primitive: block-cipher
     rationale: "AES-128 retains only ~64 bits of security under Grover's algorithm; NIST guidance prefers AES-256 for long-term confidentiality."
     source: grover-1996
     match:
@@ -232,6 +253,7 @@ classifications:
       key_bits: { eq: 128 }
   - id: aes-192-by-keysize
     quantum_status: quantum_resistant
+    primitive: block-cipher
     rationale: "AES-192 retains ~96 bits of security under Grover's algorithm, which remains infeasible to brute-force."
     source: grover-1996
     match:
@@ -239,6 +261,7 @@ classifications:
       key_bits: { eq: 192 }
   - id: aes-256-by-keysize
     quantum_status: quantum_resistant
+    primitive: block-cipher
     rationale: "AES-256 retains ~128 bits of security under Grover's algorithm."
     source: grover-1996
     match:
@@ -246,53 +269,91 @@ classifications:
       key_bits: { min: 256 }
   - id: aes-128
     quantum_status: grover_weakened
+    primitive: block-cipher
     rationale: "AES-128 retains only ~64 bits of security under Grover's algorithm; prefer AES-256 for long-term confidentiality."
     source: grover-1996
     match:
       name_patterns: ["(?i)aes[-_ ]?128"]
   - id: aes-192
     quantum_status: quantum_resistant
+    primitive: block-cipher
     rationale: "AES-192 retains ~96 bits of security under Grover's algorithm."
     source: grover-1996
     match:
       name_patterns: ["(?i)aes[-_ ]?192"]
   - id: aes-256
     quantum_status: quantum_resistant
+    primitive: block-cipher
     rationale: "AES-256 retains ~128 bits of security under Grover's algorithm."
     source: grover-1996
     match:
       name_patterns: ["(?i)aes[-_ ]?256"]
   - id: aes-unspecified
     quantum_status: grover_weakened
+    primitive: block-cipher
     rationale: "AES with an unrecorded key size is treated conservatively as Grover-weakened; record the key size to confirm whether it is AES-256 (quantum-resistant)."
     source: grover-1996
     match:
       name_patterns: ["(?i)\\baes\\b"]
 
+  - id: chacha20
+    quantum_status: quantum_resistant
+    primitive: stream-cipher
+    rationale: "ChaCha20 (including ChaCha20-Poly1305 and XChaCha20) uses a 256-bit key; Grover's algorithm reduces its security to ~128 bits, which remains infeasible to brute-force."
+    source: grover-1996
+    match:
+      name_patterns: ["(?i)chacha20", "(?i)xchacha20"]
+
   # --- Hash functions: adequate output sizes remain quantum-resistant ---
   - id: sha2-strong
     quantum_status: quantum_resistant
+    primitive: hash
     rationale: "SHA-256/384/512 keep at least ~128-bit preimage resistance under Grover's quadratic speed-up and full classical collision resistance."
     source: grover-1996
     match:
       name_patterns: ["(?i)sha[-_ ]?(256|384|512)", "(?i)sha[-_ ]?2\\b"]
   - id: sha3-strong
     quantum_status: quantum_resistant
+    primitive: hash
     rationale: "SHA-3 (Keccak) and SHAKE at adequate output sizes remain quantum-resistant; Grover only quadratically reduces preimage work."
     source: grover-1996
     match:
       name_patterns: ["(?i)sha[-_ ]?3", "(?i)sha3[-_ ]?(256|384|512)", "(?i)shake(128|256)", "(?i)keccak"]
 
 rules:
+  - id: BLP-KEX-SHOR
+    title: "Key establishment broken by Shor's algorithm (harvest-now-decrypt-later)"
+    severity: critical
+    finding_type: quantum-vulnerable-key-establishment
+    when: 'Status == "shor_broken" and Primitive in ["pke", "kem", "key-agree"]'
+    explanation: >
+      This asset performs key establishment or public-key encryption whose security rests on
+      factoring or discrete logarithms, both solved efficiently by Shor's algorithm on a
+      cryptographically relevant quantum computer. An adversary can record the protected
+      traffic today and decrypt it once such a computer exists (harvest-now-decrypt-later).
+    remediation: migrate-asymmetric-to-pqc
+  - id: BLP-SIG-SHOR
+    title: "Digital signature broken by Shor's algorithm"
+    severity: high
+    finding_type: quantum-vulnerable-signature
+    when: 'Status == "shor_broken" and Primitive == "signature"'
+    explanation: >
+      This asset is a public-key signature whose security rests on factoring or discrete
+      logarithms, broken by Shor's algorithm on a cryptographically relevant quantum computer.
+      This is a forgery/authenticity risk rather than harvest-now-decrypt-later: it does not
+      expose past traffic, but signatures could be forged once such a computer exists, so plan
+      migration for anything that must remain verifiable long-term.
+    remediation: migrate-asymmetric-to-pqc
   - id: BLP-ASYM-SHOR
     title: "Public-key algorithm broken by Shor's algorithm"
     severity: critical
     finding_type: quantum-vulnerable-asymmetric
-    when: 'Status == "shor_broken"'
+    when: 'Status == "shor_broken" and Primitive not in ["pke", "kem", "key-agree", "signature"]'
     explanation: >
-      This asset uses a public-key algorithm whose security rests on factoring or discrete
-      logarithms, both solved efficiently by Shor's algorithm on a cryptographically relevant
-      quantum computer. Data protected by it is exposed to harvest-now-decrypt-later capture.
+      This asset uses a public-key algorithm broken by Shor's algorithm on a cryptographically
+      relevant quantum computer. Its role (key establishment vs signature) could not be
+      determined from the input, so treat it as potentially exposed to harvest-now-decrypt-later
+      and confirm its use.
     remediation: migrate-asymmetric-to-pqc
   - id: BLP-CLASSIC-BROKEN
     title: "Algorithm already broken by classical cryptanalysis"

@@ -1,0 +1,41 @@
+schema_version: 1
+id: enisa-eu
+version: 0.1.0
+name: ENISA (EU) post-quantum mapping (framework overlay)
+description: >
+  Framework overlay that maps kvcbom's finding types onto the European Union Agency for
+  Cybersecurity (ENISA) post-quantum guidance. It performs no classification of its own —
+  run it with --framework alongside a classifier such as baseline-pqc. All control
+  references are TODO(source) placeholders to be filled and verified from the official
+  ENISA publications; the overlay is draft until that is done.
+status: draft
+
+sources:
+  - id: enisa-doc
+    title: "ENISA — Post-Quantum Cryptography guidance"
+    url: "TODO(source): official ENISA post-quantum publication URL"
+    status: draft
+    retrieved_date: "2026-10-21"
+
+classifications: []
+
+framework:
+  id: enisa-eu
+  name: ENISA post-quantum guidance (EU)
+  mappings:
+    - finding_type: quantum-vulnerable-key-establishment
+      control_id: "TODO(source): ENISA recommendation for quantum-vulnerable key establishment"
+      control_title: "TODO(source): recommendation text"
+      source: enisa-doc
+    - finding_type: quantum-vulnerable-signature
+      control_id: "TODO(source): ENISA recommendation for quantum-vulnerable signatures"
+      control_title: "TODO(source): recommendation text"
+      source: enisa-doc
+    - finding_type: classically-broken-primitive
+      control_id: "TODO(source): ENISA guidance on deprecated algorithms"
+      control_title: "TODO(source): recommendation text"
+      source: enisa-doc
+    - finding_type: symmetric-strength-reduced
+      control_id: "TODO(source): ENISA guidance on symmetric key strength"
+      control_title: "TODO(source): recommendation text"
+      source: enisa-doc

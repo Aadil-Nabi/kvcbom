@@ -34,6 +34,7 @@ func newReportCmd() *cobra.Command {
 		mappingFile  string
 		contextFile  string
 		packRef      string
+		frameworks   []string
 		formats      []string
 		outDir       string
 		title        string
@@ -42,6 +43,7 @@ func newReportCmd() *cobra.Command {
 		force        bool
 		failOn       string
 		pdfEngine    string
+		cbomMapping  string
 	)
 
 	cmd := &cobra.Command{
@@ -75,11 +77,38 @@ func newReportCmd() *cobra.Command {
 			if err := rulepack.ValidationError(lp.Pack.Validate()); err != nil {
 				return cli.Coded(cli.ExitValidation, err)
 			}
+			if len(lp.Pack.ClassificationEntries()) == 0 {
+				return cli.Codedf(cli.ExitUsage,
+					"rule pack %q has no classification table (it is a framework overlay); "+
+						"pass it via --framework alongside a classifier such as baseline-pqc", packRef)
+			}
+
+			// Load framework overlay packs (national regulators etc.); their control mappings
+			// are applied to the findings produced by the classifier pack above.
+			var overlays []*rulepack.Pack
+			for _, fref := range frameworks {
+				flp, err := rulepack.Load(fref)
+				if err != nil {
+					return cli.Coded(cli.ExitValidation, err)
+				}
+				if err := rulepack.ValidationError(flp.Pack.Validate()); err != nil {
+					return cli.Coded(cli.ExitValidation, err)
+				}
+				overlays = append(overlays, flp.Pack)
+			}
+
+			var cbomMap *cbom.Mapping
+			if cbomMapping != "" {
+				cbomMap, err = cbom.LoadMapping(cbomMapping)
+				if err != nil {
+					return cli.Coded(cli.ExitValidation, err)
+				}
+			}
 
 			var batches []*model.Batch
 			var ingestWarnings []string
 			for _, path := range cbomFiles {
-				res, err := cbom.IngestFile(path, cbom.Options{ValidateSchema: true})
+				res, err := cbom.IngestFile(path, cbom.Options{ValidateSchema: true, Mapping: cbomMap})
 				if err != nil {
 					// A file that cannot be decoded at all is a hard input failure.
 					return cli.Codedf(cli.ExitValidation, "%s: %v", path, err)
@@ -135,6 +164,7 @@ func newReportCmd() *cobra.Command {
 				Context:        ctx,
 				Pack:           lp.Pack,
 				PackSHA256:     lp.SHA256,
+				Overlays:       overlays,
 				Tool:           report.ToolInfo{Name: "kvcbom", Version: version.Version, Commit: version.Commit, Date: version.Date},
 				GeneratedAt:    ts,
 			})
@@ -179,7 +209,8 @@ func newReportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&registerFile, "register", "", "path to a manual register (.xlsx or .csv)")
 	cmd.Flags().StringVar(&mappingFile, "register-mapping", "", "path to a register column mapping (YAML); default mapping used otherwise")
 	cmd.Flags().StringVar(&contextFile, "context", "", "path to an assessment context file (YAML)")
-	cmd.Flags().StringVar(&packRef, "rulepack", "", "rule pack id or path (default: baseline-pqc)")
+	cmd.Flags().StringVar(&packRef, "rulepack", "", "classifier rule pack id or path (default: baseline-pqc)")
+	cmd.Flags().StringArrayVar(&frameworks, "framework", nil, "framework overlay pack id or path to also map findings onto (repeatable)")
 	cmd.Flags().StringSliceVar(&formats, "format", []string{"json"}, "output formats: json,html,md")
 	cmd.Flags().StringVar(&outDir, "out", "", "output directory (required)")
 	cmd.Flags().StringVar(&title, "title", "", "report title")
@@ -188,6 +219,7 @@ func newReportCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "write into a non-empty output directory")
 	cmd.Flags().StringVar(&failOn, "fail-on", "", "exit code 3 if any finding is at or above this severity: critical|high|medium|low|info")
 	cmd.Flags().StringVar(&pdfEngine, "pdf-engine", "purego", "PDF engine when --format includes pdf: purego (offline) or chromium (needs a local browser)")
+	cmd.Flags().StringVar(&cbomMapping, "cbom-mapping", "", "path to a CBOM extension-mapping YAML (maps vendor property keys to the algorithm)")
 	return cmd
 }
 
