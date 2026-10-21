@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25.x"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - name: Fuzz smoke
+        run: |
+          go test ./pkg/ingest/cbom     -run='^$' -fuzz=FuzzParseCBOMJSON    -fuzztime=20s
+          go test ./pkg/ingest/cbom     -run='^$' -fuzz=FuzzParseCBOMXML     -fuzztime=20s
+          go test ./pkg/ingest/context  -run='^$' -fuzz=FuzzParseContext     -fuzztime=20s
+          go test ./pkg/ingest/register -run='^$' -fuzz=FuzzParseRegisterCSV -fuzztime=20s
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  crosscompile:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build ${{ matrix.target.goos }}/${{ matrix.target.goarch }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+        run: go build -trimpath -o /dev/null ./cmd/kvcbom

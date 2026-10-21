@@ -1,0 +1,75 @@
+version: 2
+project_name: kvcbom
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: kvcbom
+    main: ./cmd/kvcbom
+    binary: kvcbom
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/Aadil-Nabi/kvcbom/internal/version.Version={{ .Version }}
+      - -X github.com/Aadil-Nabi/kvcbom/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/Aadil-Nabi/kvcbom/internal/version.Date={{ .CommitDate }}
+    # Reproducible builds: stamp the module with the commit time, not the build time.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: kvcbom
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - CHANGELOG.md
+      - LICENSE
+      - docs/**/*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# A CycloneDX SBOM of the tool itself (requires syft at release time).
+sboms:
+  - id: archive-sbom
+    artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.cyclonedx.json"
+    args: ["$artifact", "--output", "cyclonedx-json=$document"]
+
+# Keyless cosign signing of the checksums file (requires cosign at release time; run in an
+# OIDC-enabled CI so the transparency log entry is tied to the workflow identity).
+signs:
+  - id: cosign-checksum
+    cmd: cosign
+    artifacts: checksum
+    output: true
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+release:
+  draft: true # review before publishing
+  prerelease: auto
+
+changelog:
+  use: github
+  sort: asc

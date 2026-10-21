@@ -1,0 +1,163 @@
+schema_version: 1
+id: nist-ir-8547
+version: 0.1.0
+name: NIST IR 8547 transition mapping (structure only)
+description: >
+  Structure-only pack that classifies cryptographic assets using established facts and maps
+  the resulting finding types onto NIST IR 8547 transition milestones. The control
+  identifiers, requirement text, and deprecation/disallowance dates are left as
+  TODO(source) placeholders for a human to fill and verify from the official document; the
+  pack is marked draft until that is done.
+status: draft
+
+sources:
+  - id: nist-ir-8547-doc
+    title: "NIST IR 8547 (Initial Public Draft): Transition to Post-Quantum Cryptography Standards"
+    url: "https://doi.org/10.6028/NIST.IR.8547.ipd"
+    status: draft
+    retrieved_date: "2026-10-21"
+  - id: shor-1997
+    title: "Shor, P. W. (1997). Polynomial-Time Algorithms for Prime Factorization and Discrete Logarithms on a Quantum Computer. SIAM Journal on Computing 26(5)."
+    url: "https://doi.org/10.1137/S0097539795293172"
+    status: final
+    retrieved_date: "2026-10-21"
+  - id: grover-1996
+    title: "Grover, L. K. (1996). A fast quantum mechanical algorithm for database search. STOC '96."
+    url: "https://doi.org/10.1145/237814.237866"
+    status: final
+    retrieved_date: "2026-10-21"
+  - id: fips-203
+    title: "FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard (ML-KEM)"
+    url: "https://doi.org/10.6028/NIST.FIPS.203"
+    status: final
+    retrieved_date: "2026-10-21"
+  - id: fips-204
+    title: "FIPS 204: Module-Lattice-Based Digital Signature Standard (ML-DSA)"
+    url: "https://doi.org/10.6028/NIST.FIPS.204"
+    status: final
+    retrieved_date: "2026-10-21"
+  - id: sp-800-131a
+    title: "NIST SP 800-131A Rev. 2: Transitioning the Use of Cryptographic Algorithms and Key Lengths"
+    url: "https://doi.org/10.6028/NIST.SP.800-131Ar2"
+    status: final
+    retrieved_date: "2026-10-21"
+
+classifications:
+  - id: rsa
+    quantum_status: shor_broken
+    rationale: "RSA relies on integer factorisation, broken by Shor's algorithm."
+    source: shor-1997
+    match:
+      name_patterns: ["(?i)\\brsa"]
+  - id: ecc
+    quantum_status: shor_broken
+    rationale: "Elliptic-curve algorithms rely on the ECDLP, broken by Shor's algorithm."
+    source: shor-1997
+    match:
+      name_patterns: ["(?i)ecdsa", "(?i)\\becdh\\b", "(?i)\\bed(dsa|25519|448)\\b"]
+  - id: dh
+    quantum_status: shor_broken
+    rationale: "Finite-field Diffie-Hellman relies on the discrete-logarithm problem, broken by Shor's algorithm."
+    source: shor-1997
+    match:
+      name_patterns: ["(?i)diffie[-_ ]?hellman", "(?i)\\bdh\\b", "(?i)\\bdhe\\b"]
+  - id: aes-128
+    quantum_status: grover_weakened
+    rationale: "AES-128 retains only ~64 bits of security under Grover's algorithm."
+    source: grover-1996
+    match:
+      name_patterns: ["(?i)aes[-_ ]?128"]
+  - id: aes-256
+    quantum_status: quantum_resistant
+    rationale: "AES-256 retains ~128 bits of security under Grover's algorithm."
+    source: grover-1996
+    match:
+      name_patterns: ["(?i)aes[-_ ]?256"]
+  - id: sha1
+    quantum_status: classically_broken
+    rationale: "SHA-1 is collision-broken and disallowed by NIST SP 800-131A."
+    source: sp-800-131a
+    match:
+      name_patterns: ["(?i)sha[-_ ]?1\\b"]
+  - id: ml-kem
+    quantum_status: quantum_resistant
+    rationale: "ML-KEM (FIPS 203) has no known practical quantum attack."
+    source: fips-203
+    match:
+      name_patterns: ["(?i)ml[-_ ]?kem", "(?i)kyber"]
+  - id: ml-dsa
+    quantum_status: quantum_resistant
+    rationale: "ML-DSA (FIPS 204) has no known practical quantum attack."
+    source: fips-204
+    match:
+      name_patterns: ["(?i)ml[-_ ]?dsa", "(?i)dilithium"]
+
+rules:
+  - id: IR8547-ASYM
+    title: "Public-key algorithm subject to NIST IR 8547 transition"
+    severity: critical
+    finding_type: quantum-vulnerable-asymmetric
+    when: 'Status == "shor_broken"'
+    explanation: "Shor-broken public-key algorithm in scope of the NIST IR 8547 transition timeline."
+    remediation: migrate-asymmetric
+  - id: IR8547-SYM
+    title: "Symmetric algorithm weakened under Grover"
+    severity: medium
+    finding_type: symmetric-strength-reduced
+    when: 'Status == "grover_weakened"'
+    explanation: "Symmetric algorithm whose margin is halved by Grover's algorithm."
+    remediation: increase-symmetric
+  - id: IR8547-BROKEN
+    title: "Algorithm already disallowed"
+    severity: high
+    finding_type: classically-broken-primitive
+    when: 'Status == "classically_broken"'
+    explanation: "Algorithm already broken or disallowed independent of the quantum threat."
+    remediation: replace-broken
+  - id: IR8547-UNCLASSIFIED
+    title: "Asset could not be classified"
+    severity: info
+    finding_type: unclassified-crypto-asset
+    when: 'Status == "unknown"'
+    explanation: "Asset lacks the data needed to place it on the transition timeline."
+
+remediation:
+  - id: migrate-asymmetric
+    summary: "Migrate to ML-KEM / ML-DSA / SLH-DSA per the NIST IR 8547 timeline."
+    references: [fips-203, fips-204, nist-ir-8547-doc]
+  - id: increase-symmetric
+    summary: "Move to 256-bit symmetric keys for long-lived data."
+    references: [grover-1996]
+  - id: replace-broken
+    summary: "Replace disallowed algorithms (SHA-1, 3DES, etc.)."
+    references: [sp-800-131a]
+
+framework:
+  id: nist-ir-8547
+  name: NIST IR 8547 transition timelines
+  mappings:
+    - finding_type: quantum-vulnerable-asymmetric
+      control_id: "TODO(source): NIST IR 8547 deprecation/disallowance milestone for quantum-vulnerable public-key algorithms"
+      control_title: "TODO(source): transition requirement text"
+      source: nist-ir-8547-doc
+    - finding_type: symmetric-strength-reduced
+      control_id: "TODO(source): NIST IR 8547 guidance for symmetric key sizes"
+      control_title: "TODO(source): requirement text"
+      source: nist-ir-8547-doc
+    - finding_type: classically-broken-primitive
+      control_id: "TODO(source): NIST SP 800-131A disallowance reference"
+      control_title: "TODO(source): requirement text"
+      source: nist-ir-8547-doc
+
+scoring:
+  weights:
+    quantum_vulnerability: 0.4
+    mosca_exposure: 0.3
+    criticality: 0.2
+    evidence_confidence: 0.1
+  severity_scores:
+    critical: 100
+    high: 75
+    medium: 50
+    low: 25
+    info: 0

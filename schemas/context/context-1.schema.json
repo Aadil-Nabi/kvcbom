@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kvcbom.dev/schema/context-1.schema.json",
+  "title": "kvcbom assessment context (schema version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "global_migration_time_years", "crqc_scenarios"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "organisation": { "type": "string" },
+        "assessor": { "type": "string" },
+        "scope": { "type": "string" }
+      }
+    },
+    "global_migration_time_years": { "type": "number", "minimum": 0 },
+    "crqc_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "years_until"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "years_until": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "criticality"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string" },
+          "criticality": { "enum": ["low", "medium", "high", "critical"] },
+          "crown_jewel": { "type": "boolean" },
+          "data_class_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "migration_time_years": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "data_classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "confidentiality_lifetime_years"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "confidentiality_lifetime_years": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "link_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["system_ref"],
+        "properties": {
+          "system_ref": { "type": "string", "minLength": 1 },
+          "bom_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "name_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  }
+}

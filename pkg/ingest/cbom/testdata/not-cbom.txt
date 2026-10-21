@@ -1,0 +1,1 @@
+this is not a CBOM, it is plain prose and should be rejected as an unknown format.

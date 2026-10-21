@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kvcbom.dev/schema/report-1.schema.json",
+  "title": "kvcbom assessment report (schema version 1)",
+  "type": "object",
+  "required": [
+    "schema_version", "tool", "generated_at", "title", "assessment", "pack",
+    "inputs", "warnings", "summary", "inventory", "assets", "findings",
+    "remediation", "appendix"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version", "commit", "date"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "commit": { "type": "string" },
+        "date": { "type": "string" }
+      }
+    },
+    "generated_at": { "type": "string" },
+    "title": { "type": "string" },
+    "assessment": { "type": "object" },
+    "pack": {
+      "type": "object",
+      "required": ["id", "version", "status", "sha256", "unverified_content"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "sha256": { "type": "string" },
+        "unverified_content": { "type": "boolean" }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "sha256"],
+        "properties": { "file": { "type": "string" }, "sha256": { "type": "string" } }
+      }
+    },
+    "warnings": {
+      "type": "object",
+      "required": ["unverified_rule_content", "low_confidence_finding_count", "low_confidence_finding_share"],
+      "properties": {
+        "unverified_rule_content": { "type": "boolean" },
+        "low_confidence_finding_count": { "type": "integer" },
+        "low_confidence_finding_share": { "type": "number" },
+        "messages": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_assets", "total_findings", "top_risks", "hndl_asset_count"],
+      "properties": {
+        "total_assets": { "type": "integer" },
+        "total_findings": { "type": "integer" },
+        "findings_by_severity": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+        "top_risks": { "type": "array", "items": { "type": "object" } },
+        "hndl_asset_count": { "type": "integer" },
+        "mosca_by_scenario": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["by_type", "by_quantum_status", "by_evidence_confidence", "by_system"],
+      "properties": {
+        "by_type": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+        "by_quantum_status": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+        "by_evidence_confidence": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+        "by_system": { "type": "array", "items": { "$ref": "#/$defs/count" } }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["asset", "classified", "classification", "score"],
+        "properties": {
+          "asset": { "type": "object" },
+          "classified": { "type": "boolean" },
+          "classification": { "type": "object" },
+          "score": { "type": "object" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "finding_type", "severity", "asset_id"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "finding_type": { "type": "string" },
+          "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "asset_id": { "type": "string" },
+          "requires_verification": { "type": "boolean" }
+        }
+      }
+    },
+    "systems": { "type": "array", "items": { "type": "object" } },
+    "framework": { "type": ["object", "null"] },
+    "remediation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary", "finding_count"],
+        "properties": {
+          "id": { "type": "string" },
+          "summary": { "type": "string" },
+          "finding_count": { "type": "integer" }
+        }
+      }
+    },
+    "appendix": {
+      "type": "object",
+      "required": ["methodology", "scoring_formula", "weights", "merge_decisions", "sources"],
+      "properties": {
+        "methodology": { "type": "string" },
+        "scoring_formula": { "type": "string" },
+        "weights": { "type": "object" },
+        "merge_decisions": { "type": "array" },
+        "sources": { "type": "array" }
+      }
+    }
+  },
+  "$defs": {
+    "count": {
+      "type": "object",
+      "required": ["key", "count"],
+      "properties": { "key": { "type": "string" }, "count": { "type": "integer" } }
+    }
+  }
+}

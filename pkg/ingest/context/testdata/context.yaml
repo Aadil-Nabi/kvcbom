@@ -1,0 +1,37 @@
+schema_version: 1
+meta:
+  organisation: Example Corp
+  assessor: Security Team
+  scope: Payment and logging systems
+global_migration_time_years: 5
+crqc_scenarios:
+  - name: optimistic
+    years_until: 20
+  - name: central
+    years_until: 12
+  - name: pessimistic
+    years_until: 7
+data_classes:
+  - id: pii
+    name: Personal Data
+    confidentiality_lifetime_years: 15
+  - id: ephemeral
+    name: Session Data
+    confidentiality_lifetime_years: 1
+systems:
+  - id: payments
+    name: Payments API
+    owner: payments-team
+    criticality: critical
+    crown_jewel: true
+    data_class_refs: [pii]
+    migration_time_years: 3
+  - id: logging
+    name: Logging Pipeline
+    criticality: low
+    data_class_refs: [ephemeral]
+link_rules:
+  - system_ref: payments
+    name_patterns: ["(?i)rsa", "(?i)ecdsa"]
+  - system_ref: logging
+    bom_refs: ["alg:aes-logging"]

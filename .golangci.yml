@@ -1,0 +1,44 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+    - misspell
+    - predeclared
+    - unconvert
+    - bodyclose
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true # package docs cover the API; per-symbol stutter checks are noisy here
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+
+  exclusions:
+    rules:
+      # Test files may ignore errors on obviously-safe operations and use broader patterns.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Aadil-Nabi/kvcbom

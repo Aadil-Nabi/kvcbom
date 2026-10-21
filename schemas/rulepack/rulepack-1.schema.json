@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kvcbom.dev/schema/rulepack-1.schema.json",
+  "title": "kvcbom rule pack (schema version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "version", "name", "status", "sources", "classifications"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "status": { "enum": ["final", "draft", "vendor"] },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "classifications": { "type": "array", "items": { "$ref": "#/$defs/classification" } },
+    "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+    "remediation": { "type": "array", "items": { "$ref": "#/$defs/remedy" } },
+    "framework": { "$ref": "#/$defs/framework" },
+    "scoring": { "$ref": "#/$defs/scoring" }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "url", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["final", "draft", "vendor"] },
+        "retrieved_date": { "type": "string" }
+      }
+    },
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "source"],
+      "properties": {
+        "date": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "keyBits": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "eq": { "type": "integer", "minimum": 1 },
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "oids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "param_sets": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "name_patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "primitives": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "curves": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "key_bits": { "$ref": "#/$defs/keyBits" }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "quantum_status", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "quantum_status": {
+          "enum": ["shor_broken", "grover_weakened", "quantum_resistant", "classically_broken", "unknown"]
+        },
+        "rationale": { "type": "string" },
+        "source": { "type": "string", "minLength": 1 },
+        "deprecation": { "$ref": "#/$defs/milestone" },
+        "disallowance": { "$ref": "#/$defs/milestone" },
+        "match": { "$ref": "#/$defs/match" }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "severity", "finding_type", "when"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+        "finding_type": { "type": "string", "minLength": 1 },
+        "when": { "type": "string", "minLength": 1 },
+        "explanation": { "type": "string" },
+        "remediation": { "type": "string" }
+      }
+    },
+    "remedy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "summary"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "detail": { "type": "string" },
+        "references": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "mappings": { "type": "array", "items": { "$ref": "#/$defs/mapping" } }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_type", "control_id", "source"],
+      "properties": {
+        "finding_type": { "type": "string", "minLength": 1 },
+        "control_id": { "type": "string", "minLength": 1 },
+        "control_title": { "type": "string" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "weights": { "type": "object", "additionalProperties": { "type": "number" } },
+        "severity_scores": { "type": "object", "additionalProperties": { "type": "number" } }
+      }
+    }
+  }
+}

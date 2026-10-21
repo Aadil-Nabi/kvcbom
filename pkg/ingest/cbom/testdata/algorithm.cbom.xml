@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" version="1">
+  <components>
+    <component type="cryptographic-asset" bom-ref="alg:rsa-2048">
+      <name>RSA-2048</name>
+      <cryptoProperties>
+        <assetType>algorithm</assetType>
+        <algorithmProperties>
+          <primitive>pke</primitive>
+          <parameterSetIdentifier>2048</parameterSetIdentifier>
+          <algorithmFamily>RSA</algorithmFamily>
+        </algorithmProperties>
+        <oid>1.2.840.113549.1.1.1</oid>
+      </cryptoProperties>
+    </component>
+  </components>
+</bom>

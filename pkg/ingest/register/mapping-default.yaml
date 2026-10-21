@@ -1,0 +1,23 @@
+# Default column mapping for the manual asset register (SPEC §5.2).
+# The first row of the sheet/CSV is treated as headers; each logical field below names the
+# header text to read it from. Copy this file and adjust the header names to match a
+# differently-labelled spreadsheet, then pass it with --register-mapping.
+header_row: true
+sheet: "" # first sheet when empty (XLSX only)
+list_delimiter: ";" # splits functions, systems, and data classes within one cell
+columns:
+  name: "Name"
+  type: "Type"
+  algorithm_family: "Algorithm Family"
+  parameter_set: "Parameter Set"
+  key_size_bits: "Key Size (bits)"
+  mode: "Mode"
+  primitive: "Primitive"
+  curve: "Curve"
+  oid: "OID"
+  functions: "Functions"
+  implementation: "Implementation"
+  location: "Location"
+  system_refs: "Systems"
+  data_class_refs: "Data Classes"
+  confidence: "Confidence"
