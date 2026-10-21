@@ -1,0 +1,30 @@
+# Binaries
+/kvcbom
+/kvcbom.exe
+*.exe
+*.test
+*.out
+*.prof
+
+# Build / release
+/dist/
+/bin/
+
+# Dependencies (we commit go.mod + go.sum, not vendored source unless added deliberately)
+/vendor/
+
+# Tool output (generated reports / scratch)
+/out/
+/tmp/
+*.pdf.tmp
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Fuzz corpora caches (keep curated seeds under testdata/, ignore the cache)
+testdata/fuzz/
