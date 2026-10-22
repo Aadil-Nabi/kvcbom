@@ -12,9 +12,23 @@ adapts to a scanner that records the algorithm in a vendor-specific property.
 | `--log-level` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `--log-format` | `text` | `text` \| `json` |
 | `--no-color` | `false` | Disable coloured output |
-| `--config` | — | Reserved for a config file |
+| `--config` | — | A `report` profile (YAML) — see below |
 
-Configuration precedence: flags > environment (`KVCBOM_*`) > config file > defaults.
+Configuration precedence: flags > config file > defaults.
+
+### `--config` (report profiles)
+
+`report` can take its inputs and options from a YAML profile instead of a long command line:
+`kvcbom report --config kvcbom.yaml`. The keys mirror the `report` flag names
+(`cbom`, `context`, `rulepack`, `framework`, `format`, `out`, `force`, `org`, `title`,
+`timestamp`, `fail-on`, `pdf-engine`, `register`, `register-mapping`, `cbom-mapping`). An
+explicit flag overrides the file; omitted keys fall back to their defaults. Relative paths in
+the file resolve against the file's own folder, so a profile is portable. A ready-to-edit
+sample ships at [`report-config.example.yaml`](../report-config.example.yaml).
+
+With **no** `--config`, `report` auto-loads a `kvcbom.yaml` (or `kvcbom.yml`) from the current
+directory if one is present, so `kvcbom report` alone runs the whole assessment (it prints
+`using config kvcbom.yaml`). An explicit `--config <path>` always takes precedence.
 
 ## `validate`
 

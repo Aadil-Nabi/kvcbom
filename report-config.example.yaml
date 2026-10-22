@@ -1,0 +1,39 @@
+# kvcbom report profile (example).
+#
+# Run the whole assessment with:
+#     kvcbom report --config report-config.example.yaml
+#
+# Keys mirror the `report` flags. Any flag you also pass on the command line overrides
+# the value here (precedence: flags > config > defaults). Relative paths are resolved
+# against THIS file's location, so the profile works regardless of your current directory.
+
+# One or more CBOMs (repeatable). Here the CBOM sits one folder up, in dev/pqc/.
+cbom:
+  - ../cbom-PT8DJL3B9Z-2026-10-16.cdx.json
+
+# Business context (systems, data classes, CRQC scenarios). Drives Mosca / HNDL scoring.
+# meta.organisation in this file sets the report's organisation, so --org is not needed.
+context: testdata/context-sample.yaml
+
+# Classifier pack (default: baseline-pqc). Leave as-is unless you maintain your own.
+rulepack: baseline-pqc
+
+# Regulator overlays to map findings onto (repeatable).
+framework:
+  - csa-qri-sg
+  - nist-ir-8547
+
+# Output formats and directory.
+format: [html, pdf, json]
+out: out-final
+force: true
+
+# ---- optional ----
+# title: Post-Quantum Cryptographic Readiness Assessment   # this is already the default
+# org: Example Corp                                         # overrides context meta.organisation
+# pdf-engine: purego                                        # or chromium (needs a local browser)
+# fail-on: critical                                         # exit 3 if any finding >= this severity
+# timestamp: 2026-01-01T00:00:00Z                           # fix for byte-reproducible output
+# register: assets.xlsx                                     # fold in a manual register
+# register-mapping: register-columns.yaml
+# cbom-mapping: my-scanner-mapping.yaml                     # vendor property -> algorithm

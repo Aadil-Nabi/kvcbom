@@ -55,6 +55,74 @@ func newReportCmd() *cobra.Command {
 			"HTML/Markdown/PDF into --out. It makes no network calls.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// A --config profile fills any flag the user did not set explicitly
+			// (precedence: flags > config > defaults). With no --config, a kvcbom.yaml in
+			// the current directory is auto-loaded. Paths in the file resolve relative to
+			// the file itself, so a profile is portable.
+			cfgPath, _ := cmd.Flags().GetString("config")
+			if cfgPath == "" {
+				if p := findDefaultConfig(); p != "" {
+					cfgPath = p
+					cmd.PrintErrln("using config", p)
+				}
+			}
+			if cfgPath != "" {
+				cfg, dir, err := loadReportConfig(cfgPath)
+				if err != nil {
+					return err
+				}
+				unset := func(name string) bool { return !cmd.Flags().Changed(name) }
+				if unset("cbom") && len(cfg.CBOM) > 0 {
+					cbomFiles = nil
+					for _, p := range cfg.CBOM {
+						cbomFiles = append(cbomFiles, resolveUnder(dir, p))
+					}
+				}
+				if unset("register") && cfg.Register != "" {
+					registerFile = resolveUnder(dir, cfg.Register)
+				}
+				if unset("register-mapping") && cfg.RegisterMapping != "" {
+					mappingFile = resolveUnder(dir, cfg.RegisterMapping)
+				}
+				if unset("context") && cfg.Context != "" {
+					contextFile = resolveUnder(dir, cfg.Context)
+				}
+				if unset("cbom-mapping") && cfg.CBOMMapping != "" {
+					cbomMapping = resolveUnder(dir, cfg.CBOMMapping)
+				}
+				if unset("out") && cfg.Out != "" {
+					outDir = resolveUnder(dir, cfg.Out)
+				}
+				// Rule-pack refs are embedded ids or user-managed paths, not resolved.
+				if unset("rulepack") && cfg.Rulepack != "" {
+					packRef = cfg.Rulepack
+				}
+				if unset("framework") && len(cfg.Framework) > 0 {
+					frameworks = cfg.Framework
+				}
+				if unset("format") && len(cfg.Format) > 0 {
+					formats = cfg.Format
+				}
+				if unset("title") && cfg.Title != "" {
+					title = cfg.Title
+				}
+				if unset("org") && cfg.Org != "" {
+					org = cfg.Org
+				}
+				if unset("timestamp") && cfg.Timestamp != "" {
+					timestamp = cfg.Timestamp
+				}
+				if unset("fail-on") && cfg.FailOn != "" {
+					failOn = cfg.FailOn
+				}
+				if unset("pdf-engine") && cfg.PDFEngine != "" {
+					pdfEngine = cfg.PDFEngine
+				}
+				if unset("force") && cfg.Force != nil {
+					force = *cfg.Force
+				}
+			}
+
 			if len(cbomFiles) == 0 && registerFile == "" {
 				return cli.Codedf(cli.ExitUsage, "at least one --cbom or a --register is required")
 			}

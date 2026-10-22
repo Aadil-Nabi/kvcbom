@@ -130,6 +130,46 @@ control text is a `TODO(source)` placeholder, so the report shows an "unverified
 warning until a human fills them from the official documents per [`REGULATORS.md`](REGULATORS.md).
 Everything else — findings, HNDL, Mosca, per-system view, remediation — is fully real.
 
+### Shortcut: put the flags in a config profile
+
+Typing that command every time is tedious. Move the inputs and options into a YAML **profile**
+and run `report --config`. Copy [`report-config.example.yaml`](../report-config.example.yaml),
+edit the paths, and keep it next to the project:
+
+```yaml
+cbom:
+  - ../cbom-PT8DJL3B9Z-2026-10-16.cdx.json   # relative to THIS file's folder
+context: testdata/context-sample.yaml
+framework: [csa-qri-sg, nist-ir-8547]
+format: [html, pdf, json]
+out: out-final
+force: true
+```
+
+Then the whole assessment is one short command:
+
+```cmd
+kvcbom.exe report --config report-config.example.yaml
+```
+
+Or drop the flag entirely: **name the file `kvcbom.yaml` and put it in the folder you run
+from**, and a bare `report` auto-loads it (it prints `using config kvcbom.yaml` so you know):
+
+```cmd
+kvcbom.exe report
+```
+
+Rules:
+- **Keys mirror the flag names.** Anything not in the file falls back to its default
+  (`rulepack` defaults to `baseline-pqc`; `org`/`title` come from the context file / built-in
+  default — so you rarely need them).
+- **Flags override the file.** `report --config kvcbom.yaml --format md` writes Markdown only,
+  whatever the file says. Use this to tweak one run without editing the profile.
+- **Relative paths resolve against the profile's folder**, not your current directory, so the
+  profile works no matter where you run it from. Absolute paths are used as-is.
+- **Auto-load only happens with no `--config`**, and only for `kvcbom.yaml` / `kvcbom.yml` in
+  the current directory. An explicit `--config <path>` always wins.
+
 ---
 
 ## 4. Review the report before sharing

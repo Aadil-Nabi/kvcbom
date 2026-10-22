@@ -95,6 +95,24 @@ The manual route skips the version stamp; `kvcbom version` will read `dev`. Use 
 
 ---
 
+## Make it one command for recipients (optional)
+
+A CLI with a long flag list is friction for a non-technical recipient. You can ship a
+**`kvcbom.yaml`** profile next to the binary; `report` auto-loads a `kvcbom.yaml` from the
+current directory, so the recipient just runs:
+
+```cmd
+kvcbom.exe report
+```
+
+with no flags at all. Put the CBOM and context paths in the file (relative paths resolve
+against the file's own folder, so the bundle is portable). Start from
+[`../report-config.example.yaml`](../report-config.example.yaml), rename it to `kvcbom.yaml`,
+and drop it in the same folder as the binary and inputs. See
+[`RUNBOOK.md`](RUNBOOK.md#shortcut-put-the-flags-in-a-config-profile) for the profile rules.
+
+---
+
 ## First-run OS prompts (tell recipients this)
 
 An unsigned binary downloaded from outside the machine triggers an OS safety prompt the first
