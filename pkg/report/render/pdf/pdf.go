@@ -54,7 +54,9 @@ func (PureGo) Render(r *report.Report, w io.Writer) error {
 	d.cover(r)
 	d.warnings(r)
 	d.summary(r)
+	d.inventory(r)
 	d.findings(r)
+	d.systems(r)
 	d.frameworks(r)
 	d.remediation(r)
 	d.affected(r)
@@ -97,26 +99,48 @@ func (d *doc) kv(k, v string) {
 	d.pdf.MultiCell(usableW-45, lh, d.tr(v), "", "L", false)
 }
 
-// row writes a table row with the given column widths and right-most column wrapping.
+// ensure breaks to a new page if a block of height h would cross the bottom
+// margin. Rows manage their own breaks this way so the per-cell writes never
+// trigger fpdf's automatic page break mid-row, which would desync the manual
+// X/Y bookkeeping and leave a full-page gap after every row.
+func (d *doc) ensure(h float64) {
+	_, pageH := d.pdf.GetPageSize()
+	_, y := d.pdf.GetXY()
+	if y+h > pageH-margin {
+		d.pdf.AddPage()
+	}
+}
+
+// row writes a table row with the given column widths. Every column wraps to its
+// width, and the row is sized to the tallest cell, so long text in any column
+// (not just the last) stays inside its own box instead of overflowing neighbours.
 func (d *doc) row(widths []float64, cells []string, bold bool) {
 	style := ""
 	if bold {
 		style = "B"
 	}
 	d.pdf.SetFont("Helvetica", style, 9)
-	x, y := d.pdf.GetXY()
-	// Measure the wrapped height of the last cell to size the row.
-	last := len(cells) - 1
-	lines := d.pdf.SplitLines([]byte(d.tr(cells[last])), widths[last])
-	h := lh * float64(max(1, len(lines)))
+	// Wrap every cell to its column width and size the row to the tallest one.
+	texts := make([]string, len(cells))
+	maxLines := 1
 	for i, c := range cells {
-		cx, _ := d.pdf.GetXY()
-		if i == last {
-			d.pdf.MultiCell(widths[i], lh, d.tr(c), "1", "L", false)
-			d.pdf.SetXY(cx+widths[i], y)
-		} else {
-			d.pdf.CellFormat(widths[i], h, d.tr(c), "1", 0, "L", false, 0, "")
+		texts[i] = d.tr(c)
+		if n := len(d.pdf.SplitLines([]byte(texts[i]), widths[i])); n > maxLines {
+			maxLines = n
 		}
+	}
+	h := lh * float64(maxLines)
+	// Keep the whole row on one page before capturing the row origin, so no
+	// cell below triggers an auto page break partway through the row.
+	d.ensure(h)
+	x, y := d.pdf.GetXY()
+	cx := x
+	for i, t := range texts {
+		// Full-height border box, then top-aligned wrapped text inside it.
+		d.pdf.Rect(cx, y, widths[i], h, "D")
+		d.pdf.SetXY(cx, y)
+		d.pdf.MultiCell(widths[i], lh, t, "", "L", false)
+		cx += widths[i]
 	}
 	d.pdf.SetXY(x, y+h)
 }
@@ -175,6 +199,33 @@ func (d *doc) summary(r *report.Report) {
 	}
 }
 
+// counts renders a labelled two-column tally table, matching the HTML inventory blocks.
+func (d *doc) counts(title string, cs []report.Count) {
+	if len(cs) == 0 {
+		return
+	}
+	d.pdf.Ln(1)
+	d.pdf.SetFont("Helvetica", "B", 10)
+	d.pdf.MultiCell(usableW, lh, d.tr(title), "", "L", false)
+	widths := []float64{140, 40}
+	d.row(widths, []string{"", "Count"}, true)
+	for _, c := range cs {
+		d.row(widths, []string{c.Key, fmt.Sprintf("%d", c.Count)}, false)
+	}
+}
+
+func (d *doc) inventory(r *report.Report) {
+	inv := r.Inventory
+	if len(inv.ByType)+len(inv.ByQuantumStatus)+len(inv.ByConfidence)+len(inv.BySystem) == 0 {
+		return
+	}
+	d.h2("Inventory")
+	d.counts("By asset type", inv.ByType)
+	d.counts("By quantum status", inv.ByQuantumStatus)
+	d.counts("By evidence confidence", inv.ByConfidence)
+	d.counts("By system", inv.BySystem)
+}
+
 func (d *doc) findings(r *report.Report) {
 	d.h2("Findings")
 	if len(r.FindingGroups) == 0 {
@@ -182,14 +233,43 @@ func (d *doc) findings(r *report.Report) {
 		return
 	}
 	d.para(fmt.Sprintf("Grouped by type; %d finding(s) in total.", len(r.Findings)))
-	widths := []float64{22, 16, 142}
-	d.row(widths, []string{"Severity", "Assets", "Finding"}, true)
+	widths := []float64{20, 86, 14, 60}
+	d.row(widths, []string{"Severity", "Finding", "Assets", "Affected"}, true)
 	for _, g := range r.FindingGroups {
-		txt := g.Title
-		if len(g.Assets) > 0 {
-			txt += ": " + capList(g.Assets, 6)
+		finding := g.Title
+		if g.Explanation != "" {
+			finding += "\n" + g.Explanation
 		}
-		d.row(widths, []string{g.Severity, fmt.Sprintf("%d", g.Count), txt}, false)
+		if g.RequiresVerification > 0 {
+			finding += fmt.Sprintf("\n%d require verification", g.RequiresVerification)
+		}
+		d.row(widths, []string{g.Severity, finding, fmt.Sprintf("%d", g.Count), capList(g.Assets, 12)}, false)
+	}
+}
+
+func (d *doc) systems(r *report.Report) {
+	if len(r.Systems) == 0 {
+		return
+	}
+	d.h2("Per-system view")
+	for _, s := range r.Systems {
+		name := s.System.Name
+		if s.System.CrownJewel {
+			name += " (crown jewel)"
+		}
+		d.pdf.Ln(1)
+		d.pdf.SetFont("Helvetica", "B", 11)
+		d.pdf.MultiCell(usableW, lh, d.tr(name), "", "L", false)
+		d.para(fmt.Sprintf("Criticality: %s. Assets: %d. Worst score: %.2f.",
+			s.System.Criticality, len(s.AssetIDs), s.WorstFinal))
+		if len(s.FindingCounts) > 0 {
+			var b strings.Builder
+			b.WriteString("Findings: ")
+			for _, c := range s.FindingCounts {
+				fmt.Fprintf(&b, "%s %d; ", c.Key, c.Count)
+			}
+			d.para(b.String())
+		}
 	}
 }
 
@@ -211,7 +291,11 @@ func (d *doc) remediation(r *report.Report) {
 		if item.Detail != "" {
 			d.para(item.Detail)
 		}
-		d.para(fmt.Sprintf("Applies to %d finding(s): %s.", item.FindingCount, strings.Join(item.FindingTypes, ", ")))
+		applies := fmt.Sprintf("Applies to %d finding(s): %s.", item.FindingCount, strings.Join(item.FindingTypes, ", "))
+		if len(item.References) > 0 {
+			applies += " References: " + strings.Join(item.References, ", ") + "."
+		}
+		d.para(applies)
 	}
 }
 
@@ -242,10 +326,10 @@ func (d *doc) affected(r *report.Report) {
 	}
 	d.h2("Affected assets - remediation detail")
 	d.para(fmt.Sprintf("The %d algorithm(s) that need action, with where each was found.", len(r.AffectedAssets)))
-	widths := []float64{20, 52, 33, 15, 60}
-	d.row(widths, []string{"Severity", "Algorithm", "Status", "Count", "Found at"}, true)
+	widths := []float64{15, 42, 30, 20, 23, 50}
+	d.row(widths, []string{"Severity", "Algorithm", "Status", "Role", "Occurrences", "Found at"}, true)
 	for _, a := range r.AffectedAssets {
-		d.row(widths, []string{a.Severity, a.Name, a.Status, fmt.Sprintf("%d", a.Count), capList(a.Locations, 3)}, false)
+		d.row(widths, []string{a.Severity, a.Name, a.Status, a.Primitive, fmt.Sprintf("%d", a.Count), capList(a.Locations, 6)}, false)
 	}
 }
 
@@ -257,6 +341,18 @@ func (d *doc) appendix(r *report.Report) {
 	d.pdf.SetFont("Helvetica", "B", 10)
 	d.pdf.MultiCell(usableW, lh, d.tr("Scoring"), "", "L", false)
 	d.para(r.Appendix.ScoringFormula)
+	if len(r.Appendix.MergeDecisions) > 0 {
+		d.pdf.SetFont("Helvetica", "B", 10)
+		d.pdf.MultiCell(usableW, lh, d.tr("Merge decisions"), "", "L", false)
+		d.para(fmt.Sprintf("%d asset(s) were formed by merging duplicate records across inputs.", len(r.Appendix.MergeDecisions)))
+		for _, m := range r.Appendix.MergeDecisions {
+			name := ""
+			if m.AssetName != "" {
+				name = m.AssetName + " "
+			}
+			d.para(fmt.Sprintf("- %s(%s) - merged %d source record(s)", name, m.AssetID, len(m.Sources)))
+		}
+	}
 	if len(r.Appendix.Sources) > 0 {
 		d.pdf.SetFont("Helvetica", "B", 10)
 		d.pdf.MultiCell(usableW, lh, d.tr("Sources"), "", "L", false)

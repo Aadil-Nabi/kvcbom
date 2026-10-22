@@ -70,6 +70,7 @@ it, and `diff` consumes it.
 
 ## Documentation
 
+- [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — step-by-step operations runbook to generate a report.
 - [`docs/USAGE.md`](docs/USAGE.md) — commands, flags, and examples.
 - [`docs/CONTEXT.md`](docs/CONTEXT.md) — the assessment context file.
 - [`docs/RULEPACKS.md`](docs/RULEPACKS.md) — writing and verifying a rule pack.
