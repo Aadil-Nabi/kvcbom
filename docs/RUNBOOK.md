@@ -15,36 +15,64 @@ whole procedure runs on an air-gapped host.
 
 ## Quick start
 
-Three steps. This is the whole thing; the numbered sections below just explain each part.
+Put everything in **one folder** anywhere on your drive (nothing needs to be installed — the
+rule packs, schemas, and templates are baked into the exe). You end up with:
 
-**1 — Get the binary** (skip if you already have `kvcbom.exe`):
-
-```cmd
-go build -o bin\kvcbom.exe .\cmd\kvcbom
+```
+C:\pqc-assessment\            <- any folder you like
+├─ kvcbom.exe                 <- the tool               (do not edit)
+├─ kvcbom.yaml                <- run profile            (EDIT: paths + choices)
+├─ context.yaml               <- your environment       (EDIT: systems, ports, data)
+├─ crypto-bom.cdx.json        <- your CBOM from a scanner (bring it; do not edit)
+└─ out-final\                 <- created on run; reports land here
 ```
 
-**2 — Create a profile** named `kvcbom.yaml` next to the binary (copy
-[`report-config.example.yaml`](../report-config.example.yaml) and edit the two paths):
+**1 — Drop these files in the folder:** `kvcbom.exe`, your CBOM, and copies of the two samples
+renamed: `report-config.example.yaml` → `kvcbom.yaml`, and `context-sample.yaml` →
+`context.yaml`.
+
+**2 — Edit `kvcbom.yaml`** so the paths are just the filenames in this folder:
 
 ```yaml
 cbom:
-  - ../cbom-PT8DJL3B9Z-2026-10-16.cdx.json   # your CBOM (path is relative to THIS file)
-context: testdata/context-sample.yaml        # your context file
-framework: [csa-qri-sg, nist-ir-8547]        # regulator overlays (optional)
+  - crypto-bom.cdx.json       # your CBOM's filename
+context: context.yaml
+framework: [csa-qri-sg, nist-ir-8547]   # regulator overlays (optional)
 format: [html, pdf, json]
 out: out-final
 force: true
 ```
 
-**3 — Run it** (no flags needed — `report` auto-loads `kvcbom.yaml` from the current folder):
+**3 — Edit `context.yaml`** to describe your environment (systems, ports, data classes — see
+[§2](#2-edit-your-two-files)).
+
+**4 — Open a terminal in that folder and run:**
 
 ```cmd
-bin\kvcbom.exe validate --cbom ..\cbom-PT8DJL3B9Z-2026-10-16.cdx.json --context testdata\context-sample.yaml
-bin\kvcbom.exe report
+kvcbom.exe validate --cbom crypto-bom.cdx.json --context context.yaml
+kvcbom.exe report
 start out-final\report.html
 ```
 
-That's it. The rest of this runbook explains the inputs, the review checklist, and variations.
+`report` with no flags auto-loads `kvcbom.yaml` from the current folder (it prints
+`using config kvcbom.yaml`). That's the whole thing; the sections below explain each part.
+
+---
+
+## What you edit vs. what you leave alone
+
+| File | In the folder? | You… |
+|---|---|---|
+| `kvcbom.exe` | yes | **leave alone** (the tool). |
+| `context.yaml` (from `context-sample.yaml`) | yes | **edit** — your systems, ports, data classes. The real work. |
+| `kvcbom.yaml` (from `report-config.example.yaml`) | yes | **edit** — filenames + which outputs/overlays. |
+| your CBOM (`*.cdx.json`) | yes | **bring it** — your scanner's output; never hand-edit. |
+| rule packs / schemas / templates | **no** | embedded in the exe — nothing to copy. |
+| `baseline-pqc` classifier, regulator overlays | no | leave alone (overlays only if you do the [`REGULATORS.md`](REGULATORS.md) content task). |
+
+Only in special cases you'd also add: a `cbom-mapping.yaml` (if your scanner hides the algorithm
+in a vendor property — every asset shows `unknown`), or a manual register `.xlsx`/`.csv` +
+`register-mapping.yaml`.
 
 ---
 
@@ -66,31 +94,56 @@ bin\kvcbom.exe version
 
 macOS/Linux: `go build -o bin/kvcbom ./cmd/kvcbom && ./bin/kvcbom version`.
 
----
-
-## 1. Collect your inputs
-
-1. **CBOM file(s)** — one or more. Several CBOMs merge into one assessment.
-2. **Context file** (`context.yaml`) — optional but recommended. Defines business systems,
-   which endpoints belong to them, data-class confidentiality lifetimes, and the CRQC scenarios
-   (years-until-quantum). Start from `testdata\context-sample.yaml`.
-3. **CBOM mapping** — only if your scanner hides the algorithm in a vendor property (symptom:
-   every asset is `unknown`; see Troubleshooting).
-4. **Manual register** (`.xlsx`/`.csv`) — only to fold in assets not present in any CBOM.
+Then copy `bin\kvcbom.exe` into your working folder (next section) — or, if you were handed a
+release binary, just use that. The examples below assume you run `kvcbom.exe` from the folder
+that holds it.
 
 ---
 
-## 2. Set up your profile (recommended)
+## 1. Your working folder
 
-Rather than typing a long command each time, put the inputs and options in a YAML **profile**.
-Copy [`report-config.example.yaml`](../report-config.example.yaml) to `kvcbom.yaml` and edit it:
+Create a folder anywhere (e.g. `C:\pqc-assessment\`) and place in it:
+
+- **`kvcbom.exe`** — the tool.
+- **Your CBOM** — the CycloneDX file from your scanner (any name, e.g. `crypto-bom.cdx.json`).
+  Several CBOMs are allowed; list them all under `cbom:`.
+- **`context.yaml`** — a copy of `context-sample.yaml`, edited (next section).
+- **`kvcbom.yaml`** — a copy of `report-config.example.yaml`, edited (next section).
+
+The two samples ship with the tool: `report-config.example.yaml` is in the release archive
+(or the repo root), and `context-sample.yaml` is under `testdata\` (or `docs`/the archive).
+Nothing else is needed — rule packs, schemas, and templates are inside the exe.
+
+---
+
+## 2. Edit your two files
+
+### `context.yaml` — your environment (the important one)
+
+This is what makes the assessment *yours*. Edit:
+
+- **`meta`** — `organisation`, `assessor`, `scope` (shown on the cover).
+- **`systems`** — your business systems: `name`, `criticality` (critical/high/medium/low),
+  `crown_jewel`, their `data_class_refs`, and `migration_time_years`.
+- **`link_rules`** — ⚠️ **the most important part.** Maps CBOM endpoints to your systems by
+  pattern; the sample matches by port (`:443$`, `:22$`, `:3306$`). These **must match how your
+  CBOM writes its locations**, or every asset ends up `(unlinked)` and the per-system view is
+  empty.
+- **`data_classes`** — your data types and `confidentiality_lifetime_years` (the "X" in Mosca —
+  how long the data must stay secret).
+- **`crqc_scenarios`** — your years-until-quantum assumptions (defaults 7/12/20 are reasonable).
+
+See [`CONTEXT.md`](CONTEXT.md) for the full format.
+
+### `kvcbom.yaml` — the run profile
+
+Just filenames (relative to this file's folder) and choices:
 
 ```yaml
 cbom:
-  - ../cbom-PT8DJL3B9Z-2026-10-16.cdx.json
-context: testdata/context-sample.yaml
-rulepack: baseline-pqc              # default; can omit
-framework: [csa-qri-sg, nist-ir-8547]
+  - crypto-bom.cdx.json       # your CBOM's filename
+context: context.yaml
+framework: [csa-qri-sg, nist-ir-8547]   # regulator overlays; remove the line for none
 format: [html, pdf, json]
 out: out-final
 force: true
@@ -99,19 +152,18 @@ force: true
 
 How the profile behaves:
 
-- **Every `report` flag has a matching key** — you can supply any option here instead of on the
-  command line. Keys are the flag names.
+- **Every `report` flag has a matching key** — any option can go here instead of on the command
+  line. Keys are the flag names.
 - **Omitted keys fall back to defaults** — `rulepack` → `baseline-pqc`; `org`/`title` come from
   the context file / a built-in default, so you rarely set them.
-- **Flags override the file** — `report --config kvcbom.yaml --format md` writes Markdown only,
-  whatever the file says. Handy for one-off tweaks.
-- **Relative paths resolve against the profile's folder**, not your current directory, so the
-  profile (and the whole folder) is portable. Absolute paths are used as-is.
-- **Auto-load**: with no `--config`, a `kvcbom.yaml` / `kvcbom.yml` in the current folder is
-  loaded automatically (it prints `using config kvcbom.yaml`). An explicit `--config <path>`
-  always wins.
+- **Flags override the file** — `report --format md` writes Markdown only, whatever the file
+  says. Handy for one-off tweaks.
+- **Relative paths resolve against the profile's folder**, so the whole folder is portable — move
+  or copy it anywhere and it still runs. Absolute paths are used as-is.
+- **Auto-load**: with no `--config`, `kvcbom.yaml` in the current folder loads automatically (it
+  prints `using config kvcbom.yaml`). An explicit `--config <path>` always wins.
 
-Prefer flags instead? Skip this — section 4 shows the explicit command.
+Prefer flags instead? Skip the profile — section 4 (Option B) shows the explicit command.
 
 ---
 
@@ -121,7 +173,7 @@ Always validate before generating. Read-only; it schema-checks each CBOM and lis
 gaps (missing fields that weaken scoring).
 
 ```cmd
-bin\kvcbom.exe validate --cbom ..\cbom-PT8DJL3B9Z-2026-10-16.cdx.json --context testdata\context-sample.yaml
+kvcbom.exe validate --cbom crypto-bom.cdx.json --context context.yaml
 ```
 
 - Exit `0` + `All inputs valid.` → proceed.
@@ -137,16 +189,16 @@ Add `--strict` to fail on completeness warnings, or `--json` for machine-readabl
 
 ### Option A — with a profile (recommended)
 
-If `kvcbom.yaml` is in the current folder:
+With `kvcbom.yaml` in the current folder, just:
 
 ```cmd
-bin\kvcbom.exe report
+kvcbom.exe report
 ```
 
 Or point at a named profile explicitly:
 
 ```cmd
-bin\kvcbom.exe report --config report-config.example.yaml
+kvcbom.exe report --config my-profile.yaml
 ```
 
 ### Option B — all on the command line
@@ -154,7 +206,7 @@ bin\kvcbom.exe report --config report-config.example.yaml
 Everything as flags, no profile (single line; fixed `--timestamp` for a byte-reproducible run):
 
 ```cmd
-bin\kvcbom.exe report --cbom ..\cbom-PT8DJL3B9Z-2026-10-16.cdx.json --context testdata\context-sample.yaml --framework csa-qri-sg --framework nist-ir-8547 --format html,pdf,json --out out-final --force --timestamp 2026-01-01T00:00:00Z
+kvcbom.exe report --cbom crypto-bom.cdx.json --context context.yaml --framework csa-qri-sg --framework nist-ir-8547 --format html,pdf,json --out out-final --force --timestamp 2026-01-01T00:00:00Z
 ```
 
 (`--rulepack baseline-pqc` is the default; `--org`/`--title` come from the context file / the

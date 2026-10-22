@@ -97,19 +97,29 @@ The manual route skips the version stamp; `kvcbom version` will read `dev`. Use 
 
 ## Make it one command for recipients (optional)
 
-A CLI with a long flag list is friction for a non-technical recipient. You can ship a
-**`kvcbom.yaml`** profile next to the binary; `report` auto-loads a `kvcbom.yaml` from the
-current directory, so the recipient just runs:
+A CLI with a long flag list is friction for a non-technical recipient. Ship a **self-contained
+folder** so they run the tool in place with no flags. The release archive already contains the
+two starter files (`report-config.example.yaml` and `context-sample.yaml`) next to the docs, so
+the recipient's folder looks like:
+
+```
+C:\pqc-assessment\
+├─ kvcbom.exe
+├─ kvcbom.yaml            (renamed from report-config.example.yaml, paths = local filenames)
+├─ context.yaml          (renamed from context-sample.yaml, edited for their environment)
+└─ crypto-bom.cdx.json   (their CBOM)
+```
+
+`report` auto-loads a `kvcbom.yaml` from the current directory, so they just run:
 
 ```cmd
 kvcbom.exe report
 ```
 
-with no flags at all. Put the CBOM and context paths in the file (relative paths resolve
-against the file's own folder, so the bundle is portable). Start from
-[`../report-config.example.yaml`](../report-config.example.yaml), rename it to `kvcbom.yaml`,
-and drop it in the same folder as the binary and inputs. See
-[`RUNBOOK.md`](RUNBOOK.md#shortcut-put-the-flags-in-a-config-profile) for the profile rules.
+with no flags at all. Keep the paths in `kvcbom.yaml` as **local filenames** (relative paths
+resolve against the file's own folder), so the whole folder is portable — they can unzip it
+anywhere on their drive. See
+[`RUNBOOK.md`](RUNBOOK.md#2-edit-your-two-files) for exactly which files they edit.
 
 ---
 

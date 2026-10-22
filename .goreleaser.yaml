@@ -38,6 +38,10 @@ archives:
       - CHANGELOG.md
       - LICENSE
       - docs/**/*
+      # Starter files a user copies and edits (see docs/RUNBOOK.md).
+      - report-config.example.yaml
+      - src: testdata/context-sample.yaml
+        dst: context-sample.yaml
 
 checksum:
   name_template: "checksums.txt"
