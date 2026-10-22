@@ -54,10 +54,11 @@ func newValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate",
-		Short: "Validate CBOMs against CycloneDX 1.6 and report completeness gaps",
-		Long: "validate schema-checks each CBOM against CycloneDX 1.6 and lists fields that,\n" +
-			"if missing, weaken risk scoring. Exit code 2 indicates a validation failure;\n" +
-			"with --strict, completeness warnings also fail.",
+		Short: "Validate CBOMs against CycloneDX (1.6/1.7) and report completeness gaps",
+		Long: "validate schema-checks each CBOM against CycloneDX 1.6 or 1.7 (selected from the\n" +
+			"document's specVersion) and lists fields that, if missing, weaken risk scoring.\n" +
+			"Exit code 2 indicates a validation failure; with --strict, completeness warnings\n" +
+			"also fail.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if len(cbomFiles) == 0 {

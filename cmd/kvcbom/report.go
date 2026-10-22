@@ -50,8 +50,9 @@ func newReportCmd() *cobra.Command {
 		Use:   "report",
 		Short: "Run the full assessment and write a report in one or more formats",
 		Long: "report ingests CBOMs (and an optional register and context), classifies and\n" +
-			"scores the inventory with the selected rule pack, and writes the canonical JSON\n" +
-			"plus any requested HTML/Markdown into --out. It makes no network calls.",
+			"scores the inventory with the selected rule pack, maps findings onto any\n" +
+			"framework overlays, and writes the canonical JSON plus any requested\n" +
+			"HTML/Markdown/PDF into --out. It makes no network calls.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if len(cbomFiles) == 0 && registerFile == "" {
@@ -211,7 +212,7 @@ func newReportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&contextFile, "context", "", "path to an assessment context file (YAML)")
 	cmd.Flags().StringVar(&packRef, "rulepack", "", "classifier rule pack id or path (default: baseline-pqc)")
 	cmd.Flags().StringArrayVar(&frameworks, "framework", nil, "framework overlay pack id or path to also map findings onto (repeatable)")
-	cmd.Flags().StringSliceVar(&formats, "format", []string{"json"}, "output formats: json,html,md")
+	cmd.Flags().StringSliceVar(&formats, "format", []string{"json"}, "output formats: json,html,md,pdf")
 	cmd.Flags().StringVar(&outDir, "out", "", "output directory (required)")
 	cmd.Flags().StringVar(&title, "title", "", "report title")
 	cmd.Flags().StringVar(&org, "org", "", "organisation name (overrides the context value)")

@@ -19,7 +19,7 @@ func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "kvcbom",
 		Short: "Post-quantum cryptographic readiness assessment from CBOMs",
-		Long: "kvcbom consumes CycloneDX 1.6 Cryptographic Bills of Materials (CBOMs),\n" +
+		Long: "kvcbom consumes CycloneDX 1.6 and 1.7 Cryptographic Bills of Materials (CBOMs),\n" +
 			"risk-scores the inventoried cryptographic assets for quantum exposure, and\n" +
 			"generates shareable readiness reports. It makes no network calls.",
 		Version:       version.Version,
