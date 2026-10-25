@@ -41,16 +41,59 @@ program. The macOS/Linux equivalent of `kvcbom.exe` is a binary simply named `kv
 
 ## Build the artifacts
 
-### Option A — GoReleaser (recommended)
+**You only need Go.** `make` and `goreleaser` are optional conveniences — Options A and B below
+use nothing but `go build`. Only Option C (full release archives + checksums + SBOM) needs the
+extra tooling.
 
-Produces every platform archive at once, plus `checksums.txt`, a CycloneDX SBOM of the tool,
-and a keyless cosign signature over the checksums.
+### Option A — one Windows binary (simplest)
+
+This is all you need to hand someone a Windows exe. From the repo root:
 
 ```cmd
-make snapshot          :: local build of all platforms into .\dist\  (no git tag needed)
+go build -trimpath -o kvcbom.exe .\cmd\kvcbom
 ```
 
-For a real, versioned release, tag the commit and run GoReleaser proper (CI does this):
+That produces a working, self-contained `kvcbom.exe`. `kvcbom version` will read `dev` (no
+version baked in) — fine for internal use. To stamp the real version/commit/date, run this in
+**Git Bash** (one line):
+
+```sh
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/Aadil-Nabi/kvcbom/internal/version.Version=$(git describe --tags --always --dirty 2>/dev/null || echo dev) -X github.com/Aadil-Nabi/kvcbom/internal/version.Commit=$(git rev-parse --short HEAD) -X github.com/Aadil-Nabi/kvcbom/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o kvcbom.exe ./cmd/kvcbom
+```
+
+### Option B — all platforms by hand (still only Go)
+
+Cross-compile every target from your machine (the target machine needs nothing). In **Git Bash**:
+
+```sh
+export CGO_ENABLED=0
+GOOS=windows GOARCH=amd64 go build -trimpath -o dist/windows-amd64/kvcbom.exe ./cmd/kvcbom
+GOOS=darwin  GOARCH=arm64 go build -trimpath -o dist/darwin-arm64/kvcbom      ./cmd/kvcbom
+GOOS=darwin  GOARCH=amd64 go build -trimpath -o dist/darwin-amd64/kvcbom      ./cmd/kvcbom
+GOOS=linux   GOARCH=amd64 go build -trimpath -o dist/linux-amd64/kvcbom       ./cmd/kvcbom
+GOOS=linux   GOARCH=arm64 go build -trimpath -o dist/linux-arm64/kvcbom       ./cmd/kvcbom
+```
+
+In `cmd.exe` the per-line form is `set GOOS=darwin& set GOARCH=arm64& go build -trimpath -o ...`.
+Add the `-ldflags "..."` from Option A to any of these to bake in the version.
+
+### Option C — full release archives (optional: needs GoReleaser)
+
+Only for proper releases: per-platform `.zip`/`.tar.gz` bundling the docs, plus `checksums.txt`,
+a CycloneDX SBOM, and a cosign signature. Requires `goreleaser` (v2); `make` is **not** required
+— run the command directly. Install GoReleaser once (needs Go):
+
+```sh
+go install github.com/goreleaser/goreleaser/v2@latest
+```
+
+Then, local snapshot (no git tag needed) — equivalent to `make snapshot`:
+
+```sh
+goreleaser release --snapshot --clean      # writes archives to ./dist/
+```
+
+For a real, versioned release (CI does this):
 
 ```sh
 git tag v0.1.0
@@ -58,29 +101,12 @@ goreleaser release --clean
 ```
 
 Notes:
-- `make snapshot` runs the pre-build hooks (`go mod tidy`, `go test ./...`) and writes archives
-  to `.\dist\`. The SBOM and cosign signing steps run on a **tagged release**, not a snapshot
-  (they need `syft` and `cosign` present, and cosign expects an OIDC-enabled CI).
-- Each archive bundles `README.md`, `CHANGELOG.md`, `LICENSE`, and `docs/**` alongside the
-  binary — so the recipient gets the runbook in the box.
-
-### Option B — one target by hand
-
-Cross-compile from your Windows machine (only *you* need Go; the target machine needs nothing).
-In `cmd.exe`:
-
-```cmd
-set CGO_ENABLED=0
-
-set GOOS=windows& set GOARCH=amd64& go build -trimpath -o dist\windows-amd64\kvcbom.exe .\cmd\kvcbom
-set GOOS=darwin&  set GOARCH=arm64& go build -trimpath -o dist\darwin-arm64\kvcbom      .\cmd\kvcbom
-set GOOS=darwin&  set GOARCH=amd64& go build -trimpath -o dist\darwin-amd64\kvcbom      .\cmd\kvcbom
-set GOOS=linux&   set GOARCH=amd64& go build -trimpath -o dist\linux-amd64\kvcbom       .\cmd\kvcbom
-set GOOS=linux&   set GOARCH=arm64& go build -trimpath -o dist\linux-arm64\kvcbom       .\cmd\kvcbom
-```
-
-The manual route skips the version stamp; `kvcbom version` will read `dev`. Use `make build`
-(or GoReleaser) when you want the version/commit/date baked in.
+- It runs the pre-build hooks (`go mod tidy`, `go test ./...`) and writes to `./dist/`. The SBOM
+  and cosign signing run on a **tagged release**, not a snapshot (they need `syft` and `cosign`
+  present, and cosign expects an OIDC-enabled CI).
+- Each archive bundles `README.md`, `CHANGELOG.md`, `LICENSE`, `docs/**`, and the two starter
+  files (`report-config.example.yaml`, `context-sample.yaml`) alongside the binary — so the
+  recipient gets the runbook and templates in the box.
 
 ---
 
