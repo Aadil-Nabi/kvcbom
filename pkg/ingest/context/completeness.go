@@ -70,8 +70,8 @@ func checkCompleteness(c *model.Context) []Issue {
 		if _, ok := sysIDs[l.SystemRef]; !ok {
 			add(LevelWarn, fmt.Sprintf("link_rule #%d", i+1), fmt.Sprintf("references undefined system %q", l.SystemRef))
 		}
-		if len(l.BOMRefs) == 0 && len(l.NamePatterns) == 0 {
-			add(LevelInfo, fmt.Sprintf("link_rule #%d", i+1), "has no bom_refs or name_patterns and will match nothing")
+		if len(l.BOMRefs) == 0 && len(l.NamePatterns) == 0 && len(l.LocationPatterns) == 0 {
+			add(LevelInfo, fmt.Sprintf("link_rule #%d", i+1), "has no bom_refs, name_patterns, or location_patterns and will match nothing")
 		}
 	}
 

@@ -8,8 +8,9 @@ check" guide.
 `kvcbom` makes **no network calls** — rule packs, schemas, and templates are embedded, so the
 whole procedure runs on an air-gapped host.
 
-> Examples use Windows `cmd.exe` (`\` paths, `bin\kvcbom.exe`). On macOS/Linux swap to `/` and
-> `./bin/kvcbom`.
+> Examples use Windows `cmd.exe` (`\` paths). **In PowerShell, prefix the exe with `.\`** —
+> `.\kvcbom.exe report` — because PowerShell does not run programs from the current folder
+> otherwise. On macOS/Linux use `./kvcbom`.
 
 ---
 
@@ -73,6 +74,12 @@ start out-final\report.html
 Only in special cases you'd also add: a `cbom-mapping.yaml` (if your scanner hides the algorithm
 in a vendor property — every asset shows `unknown`), or a manual register `.xlsx`/`.csv` +
 `register-mapping.yaml`.
+
+> **Learning the two files you edit?** Both samples —
+> [`context-sample.yaml`](../testdata/context-sample.yaml) and
+> [`report-config.example.yaml`](../report-config.example.yaml) — are commented line by line.
+> Read them to understand every field, then copy and trim as your `context.yaml` / `kvcbom.yaml`
+> (comments are ignored, so keep or delete them).
 
 ---
 
@@ -211,6 +218,21 @@ kvcbom.exe report --cbom crypto-bom.cdx.json --context context.yaml --framework 
 
 (`--rulepack baseline-pqc` is the default; `--org`/`--title` come from the context file / the
 built-in default — so none are needed here.)
+
+It prints its progress as it goes (a green ✓ per step in a colour terminal, `[ok]` otherwise):
+
+```
+✓ Loaded rule pack baseline-pqc 1.0.0
+✓ Loaded 2 framework overlay(s): csa-qri-sg, nist-ir-8547
+✓ Read CBOM crypto-bom.cdx.json (540 asset(s))
+✓ Loaded context context.yaml (4 system(s))
+✓ Classified and scored: 351 asset(s), 351 finding(s), 107 HNDL
+
+✓ Report generated successfully
+    out-final\report.html
+    out-final\report.json
+    out-final\report.pdf
+```
 
 ### Open the result
 

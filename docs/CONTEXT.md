@@ -45,8 +45,9 @@ link_rules:                      # attach CBOM assets to systems
 
 `location_patterns` are the usual way to link **scanner** CBOMs: those name each asset by its
 endpoint (e.g. `172.31.100.76:443`), which kvcbom records as the asset's location, so you map
-by port or host. A worked example that maps the bundled scanner CBOM lives at
-[`testdata/context-sample.yaml`](../testdata/context-sample.yaml).
+by port or host. A worked, fully line-by-line commented example that maps the bundled scanner
+CBOM lives at [`testdata/context-sample.yaml`](../testdata/context-sample.yaml) — read it to
+understand every field, then copy it to your `context.yaml` and adapt.
 
 ## How linking works
 

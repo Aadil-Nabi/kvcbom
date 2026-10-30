@@ -1,25 +1,69 @@
-# Sample assessment context for the bundled scanner CBOM (testdata/cbom-PT8DJL3B9Z-*.cdx.json).
-# It maps scanner endpoints to business systems by PORT so the Mosca / harvest-now-decrypt-later
-# (HNDL) scoring can run. Copy and adapt the systems, data classes, and CRQC assumptions to a
-# real environment. CRQC years are assumptions you choose — not facts kvcbom asserts.
-schema_version: 1
-meta:
-  organisation: Example Corp
-  assessor: Security Team
-  scope: Internet-facing and internal services discovered by the network scan
+# ============================================================================
+#  Assessment CONTEXT file (worked sample + full explanation).
+# ----------------------------------------------------------------------------
+#  Maps the bundled scanner CBOM (cbom-PT8DJL3B9Z-*.cdx.json) to business
+#  systems BY PORT. Copy this to  context.yaml  and adapt it to your own
+#  environment. Comments are ignored by the parser, so keep or delete them.
+#
+#  The context file carries the BUSINESS facts a CBOM cannot: whose crypto this
+#  is, how long data must stay secret, how long migration takes, and when a
+#  quantum computer might arrive. It is OPTIONAL — without it, assets are still
+#  classified, but there is no per-system view, no criticality, and no Mosca /
+#  harvest-now-decrypt-later (HNDL) scoring.
+#
+#  Mosca needs three numbers, all supplied here. A system is EXPOSED when X+Y>Z:
+#     X = how long data must stay secret  (data_classes.confidentiality_lifetime_years)
+#     Y = how long migration takes        (global_migration_time_years / per-system)
+#     Z = years until a quantum computer   (crqc_scenarios.years_until)
+# ============================================================================
 
+# Format version of THIS file. Lets the format evolve without misreading old
+# files. Leave at 1.  (required)
+schema_version: 1
+
+# Cover-page identity, shown at the top of the report.  (meta required; fields optional)
+meta:
+  organisation: Example Corp                 # who the report is FOR (sets the report's
+                                             # organisation, so --org is not needed)
+  assessor: Security Team                    # who RAN the assessment
+  scope: Internet-facing and internal services discovered by the network scan
+                                             # what the assessment COVERS (its boundary)
+
+# Y (default) — YEARS it realistically takes you to migrate crypto. Used for any
+# system that does not set its own migration_time_years below. Larger Y = less
+# runway before a quantum computer, so more assets are flagged.  (required)
 global_migration_time_years: 5
 
+# Z — your assumptions for YEARS until a Cryptographically Relevant Quantum
+# Computer (CRQC). Nobody knows, so give a RANGE; the tool never hard-codes it.
+# Each scenario becomes a row in the report's "Mosca exposure by scenario" table.
+#   name        : a label you choose
+#   years_until : your estimate, in years from now
 crqc_scenarios:
-  - { name: optimistic,  years_until: 20 }
-  - { name: central,     years_until: 12 }
-  - { name: pessimistic, years_until: 7 }
+  - { name: optimistic,  years_until: 20 }   # few assets exposed
+  - { name: central,     years_until: 12 }   # your "most likely" case
+  - { name: pessimistic, years_until: 7 }    # most assets exposed (plan against this)
 
+# X — the kinds of data you hold and YEARS each must stay secret. This is the
+# heart of harvest-now-decrypt-later: data that must stay secret for 15 years,
+# protected today by quantum-breakable crypto, is exposed if a CRQC arrives
+# within ~15 years. Short-lived data is often NOT HNDL-exposed.
+#   id / name / confidentiality_lifetime_years (the X value)
 data_classes:
-  - { id: customer-pii, name: Customer personal data, confidentiality_lifetime_years: 15 }
+  - { id: customer-pii, name: Customer personal data,     confidentiality_lifetime_years: 15 }
   - { id: credentials,  name: Administrative credentials, confidentiality_lifetime_years: 10 }
-  - { id: source-code,  name: Proprietary source code, confidentiality_lifetime_years: 7 }
+  - { id: source-code,  name: Proprietary source code,    confidentiality_lifetime_years: 7 }
 
+# Your real business systems. Each appears in the report's "Per-system view"
+# with its own finding counts and worst score, so risk is prioritised by what a
+# system is worth — not just by algorithm.  (at least one required)
+#   id              : internal handle, referenced by link_rules (required)
+#   name            : shown in the report (required)
+#   owner           : who is accountable (optional, informational)
+#   criticality     : low | medium | high | critical — feeds the score
+#   crown_jewel     : true forces criticality to the maximum
+#   data_class_refs : which data_classes (X) this system holds
+#   migration_time_years : overrides the global Y for this system (optional)
 systems:
   - id: customer-web
     name: Customer-facing web tier
@@ -44,12 +88,25 @@ systems:
     criticality: medium
     data_class_refs: [source-code]
 
+# >>> THE MOST IMPORTANT PART TO GET RIGHT <<<
+# link_rules attach CBOM assets to your systems. A matched asset INHERITS that
+# system's data_classes (the X value) — which is what makes HNDL/Mosca scoring
+# work. If these patterns do not match how your CBOM names things, every asset
+# lands in "(unlinked)" and the Per-system view is empty. Check the Per-system
+# view after your first run.
+#
+# Each rule names a system_ref plus ONE of (you can mix):
+#   location_patterns : Go RE2 regex on the asset's LOCATION. Scanner CBOMs name
+#                       assets by endpoint (e.g. 172.31.100.76:443), so match by
+#                       port or host. The usual choice for scan CBOMs.
+#   name_patterns     : Go RE2 regex on the ALGORITHM/asset NAME (e.g. (?i)rsa).
+#   bom_refs          : exact CycloneDX bom-ref string match.
 link_rules:
   - system_ref: customer-web
-    location_patterns: [":443$", ":8443$"]
+    location_patterns: [":443$", ":8443$"]   # HTTPS endpoints -> web tier
   - system_ref: databases
-    location_patterns: [":3306$", ":5432$"]
+    location_patterns: [":3306$", ":5432$"]  # MySQL / PostgreSQL ports -> databases
   - system_ref: admin-access
-    location_patterns: [":22$"]
+    location_patterns: [":22$"]              # SSH -> admin access
   - system_ref: source-control
-    location_patterns: ["(?i)\\.git"]
+    location_patterns: ["(?i)\\.git"]        # anything containing ".git" -> source control

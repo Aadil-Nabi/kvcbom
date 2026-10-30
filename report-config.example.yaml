@@ -1,39 +1,92 @@
-# kvcbom report profile (example).
+# ============================================================================
+#  kvcbom RUN PROFILE (example + full explanation).
+# ----------------------------------------------------------------------------
+#  This file is just the `report` command-line flags written into YAML, so you
+#  run  `kvcbom report`  instead of typing a dozen --flags. Copy it to
+#  kvcbom.yaml  next to kvcbom.exe and `report` auto-loads it:
+#       .\kvcbom.exe report        (PowerShell — note the .\ )
+#       kvcbom.exe report          (cmd.exe)
 #
-# Run the whole assessment with:
-#     kvcbom report --config report-config.example.yaml
-#
-# Keys mirror the `report` flags. Any flag you also pass on the command line overrides
-# the value here (precedence: flags > config > defaults). Relative paths are resolved
-# against THIS file's location, so the profile works regardless of your current directory.
+#  Rules of the file:
+#    * Every key equals a `report` flag (same name).
+#    * A flag on the command line OVERRIDES the value here
+#        (precedence: flags > this file > defaults).
+#    * Relative paths resolve against THIS file's folder — keep the profile,
+#      the CBOM, and the context file together and just use filenames.
+#    * Keys you leave out fall back to their defaults.
+#  Comments are ignored by the parser; this file is itself a valid profile.
+# ============================================================================
 
-# One or more CBOMs (repeatable). Here the CBOM sits one folder up, in dev/pqc/.
+# -------- required inputs --------
+
+# The CBOM(s) to assess (flag: --cbom). A list — add several and they MERGE into
+# one assessment. Use the filename as it sits next to this file.
 cbom:
-  - ../cbom-PT8DJL3B9Z-2026-10-16.cdx.json
+  - crypto-bom.cdx.json
 
-# Business context (systems, data classes, CRQC scenarios). Drives Mosca / HNDL scoring.
-# meta.organisation in this file sets the report's organisation, so --org is not needed.
-context: testdata/context-sample.yaml
+# The context file describing your environment (flag: --context). Optional in
+# theory, but without it there is no per-system view, criticality, or HNDL/Mosca
+# scoring — just raw classification. (See context-sample.yaml, which is fully
+# commented.)
+context: context.yaml
 
-# Classifier pack (default: baseline-pqc). Leave as-is unless you maintain your own.
-rulepack: baseline-pqc
+# -------- what to produce --------
 
-# Regulator overlays to map findings onto (repeatable).
+# Regulator overlays to map findings onto (flag: --framework). A list — one
+# report can speak to several regulators at once. Remove this block for none.
+# Available: csa-qri-sg, nist-ir-8547, cnsa-2.0, enisa-eu, uk-ncsc.
+# (Their control text shows as TODO until a human verifies it; see REGULATORS.md.)
 framework:
   - csa-qri-sg
   - nist-ir-8547
 
-# Output formats and directory.
+# Output formats to write (flag: --format). Any of: json, html, md, pdf.
+#   json = the canonical machine file (and what `diff` reads) — keep it.
+#   html / pdf = the human-readable reports.  md = Markdown.
 format: [html, pdf, json]
+
+# Output directory (flag: --out). Reports are written here (created if missing).
 out: out-final
+
+# Allow writing into a non-empty output directory (flag: --force). Without this,
+# a second run into the same folder errors to avoid overwriting. true = convenient
+# for repeated runs.
 force: true
 
-# ---- optional ----
-# title: Post-Quantum Cryptographic Readiness Assessment   # this is already the default
-# org: Example Corp                                         # overrides context meta.organisation
-# pdf-engine: purego                                        # or chromium (needs a local browser)
-# fail-on: critical                                         # exit 3 if any finding >= this severity
-# timestamp: 2026-01-01T00:00:00Z                           # fix for byte-reproducible output
-# register: assets.xlsx                                     # fold in a manual register
+# -------- optional (uncomment to use) --------
+
+# Classifier rule pack (flag: --rulepack). Defaults to baseline-pqc, the
+# NIST-grounded classifier. Only set this to use your own classifier pack.
+# rulepack: baseline-pqc
+
+# Report title on the cover (flag: --title). Already defaults to the line below.
+# title: Post-Quantum Cryptographic Readiness Assessment
+
+# Organisation name (flag: --org). Overrides meta.organisation from the context
+# file. Usually unnecessary — set it in the context file instead.
+# org: Example Corp
+
+# PDF engine (flag: --pdf-engine):
+#   purego   = default, fully offline, needs nothing (recommended).
+#   chromium = higher-fidelity PDF, but needs a local Chrome/Chromium.
+# pdf-engine: purego
+
+# CI gate (flag: --fail-on). Make the command exit with code 3 if ANY finding is
+# at or above this severity: critical | high | medium | low | info.
+# fail-on: critical
+
+# Fix the report timestamp (flag: --timestamp), RFC3339. Setting it makes output
+# byte-reproducible: identical inputs produce an identical report (PDF included).
+# Leave unset to stamp "now".
+# timestamp: 2026-01-01T00:00:00Z
+
+# Fold in a manual inventory of crypto not present in any CBOM (flags: --register,
+# --register-mapping). The register is an .xlsx/.csv; the mapping YAML says which
+# columns are which.
+# register: assets.xlsx
 # register-mapping: register-columns.yaml
-# cbom-mapping: my-scanner-mapping.yaml                     # vendor property -> algorithm
+
+# Tell the tool where a vendor scanner hid the algorithm (flag: --cbom-mapping).
+# Fix for "every asset shows up as unknown": point this at a small YAML mapping
+# the scanner's property key to the algorithm.
+# cbom-mapping: my-scanner-mapping.yaml

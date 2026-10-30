@@ -138,6 +138,8 @@ func newReportCmd() *cobra.Command {
 				return cli.Coded(cli.ExitUsage, err)
 			}
 
+			prog := newProgress(cmd)
+
 			// Load the rule pack and refuse to run on a pack with errors.
 			lp, err := rulepack.Load(packRef)
 			if err != nil {
@@ -151,6 +153,7 @@ func newReportCmd() *cobra.Command {
 					"rule pack %q has no classification table (it is a framework overlay); "+
 						"pass it via --framework alongside a classifier such as baseline-pqc", packRef)
 			}
+			prog.step("Loaded rule pack %s %s", lp.Pack.Meta().ID, lp.Pack.Meta().Version)
 
 			// Load framework overlay packs (national regulators etc.); their control mappings
 			// are applied to the findings produced by the classifier pack above.
@@ -164,6 +167,9 @@ func newReportCmd() *cobra.Command {
 					return cli.Coded(cli.ExitValidation, err)
 				}
 				overlays = append(overlays, flp.Pack)
+			}
+			if len(overlays) > 0 {
+				prog.step("Loaded %d framework overlay(s): %s", len(overlays), strings.Join(frameworks, ", "))
 			}
 
 			var cbomMap *cbom.Mapping
@@ -190,6 +196,7 @@ func newReportCmd() *cobra.Command {
 						fmt.Sprintf("%s did not fully conform to CycloneDX 1.6: %v", path, res.SchemaError))
 				}
 				batches = append(batches, res.Batch)
+				prog.step("Read CBOM %s (%d asset(s))", path, len(res.Batch.Assets))
 			}
 
 			if registerFile != "" {
@@ -209,6 +216,7 @@ func newReportCmd() *cobra.Command {
 					ingestWarnings = append(ingestWarnings, "register: "+warn)
 				}
 				batches = append(batches, res.Batch)
+				prog.step("Read register %s (%d asset(s))", registerFile, len(res.Batch.Assets))
 			}
 
 			var ctx *model.Context
@@ -223,6 +231,7 @@ func newReportCmd() *cobra.Command {
 				if org != "" {
 					assessment.Organisation = org // flag overrides the context value
 				}
+				prog.step("Loaded context %s (%d system(s))", contextFile, len(ctx.Systems))
 			}
 
 			rep, err := report.Build(report.Input{
@@ -240,6 +249,8 @@ func newReportCmd() *cobra.Command {
 			if err != nil {
 				return cli.Coded(cli.ExitInternal, err)
 			}
+			prog.step("Classified and scored: %d asset(s), %d finding(s), %d HNDL",
+				rep.Summary.TotalAssets, rep.Summary.TotalFindings, rep.Summary.HNDLAssetCount)
 
 			if err := prepareOutDir(outDir, force); err != nil {
 				return err
@@ -248,9 +259,7 @@ func newReportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for _, f := range written {
-				cmd.PrintErrln("wrote", f)
-			}
+			prog.done(written)
 
 			// Policy gate: exit 3 when a finding meets or exceeds the threshold (SPEC §8).
 			if failOn != "" {
